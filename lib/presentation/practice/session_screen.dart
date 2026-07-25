@@ -793,9 +793,8 @@ class _AudienceRow extends StatelessWidget {
   }
 }
 
-/// A single audience "participant" tile: one La Banca face + a mic glyph that
-/// brightens with the live mic level. No fake human name — La Banca stays a
-/// stylized, unnamed audience.
+/// A single audience "participant" tile: one reacting La Banca face. No fake
+/// human name — La Banca stays a stylized, unnamed audience.
 class _AudienceTile extends StatelessWidget {
   final double energy;
   final AppTokens tokens;
@@ -809,7 +808,6 @@ class _AudienceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final live = energy > 0.15;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -817,35 +815,11 @@ class _AudienceTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.button),
         border: Border.all(color: tokens.line),
       ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: LaBanca(
-              energy: energy,
-              faceCount: 1,
-              height: 84,
-              personality: personality,
-            ),
-          ),
-          Positioned(
-            left: 6,
-            bottom: 6,
-            child: Container(
-              width: 22,
-              height: 22,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppTokens.dark.surface.withValues(alpha: 0.62),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.mic_rounded,
-                size: 12,
-                color: live ? tokens.accent : AppTokens.dark.inkFaint,
-              ),
-            ),
-          ),
-        ],
+      child: LaBanca(
+        energy: energy,
+        faceCount: 1,
+        height: 84,
+        personality: personality,
       ),
     );
   }

@@ -6,24 +6,21 @@ import 'package:flutter/scheduler.dart';
 import '../../app/theme/tokens.dart';
 import 'audience_mood.dart';
 
-/// "La Banca" — the audience. A little face (or row of them) that reacts, live,
-/// to how the child is speaking. The on-device stand-in for the web's avatar:
-/// the audience *is* the live feedback, so no corrective text ever appears while
-/// the child talks.
+/// "La Banca" — one audience face that reacts, live, to how the child is
+/// speaking. The reaction ballistics live in the pure [AudienceMood]
+/// (fast-attack engagement + slow boredom), advanced here by a frame [Ticker]
+/// with real dt. The face itself is an expressive EMOJI chosen from the mood and
+/// crossfaded — friendly at rest (never sad), delighted when the child projects,
+/// and only checked-out after sustained dead air.
 ///
-/// [energy] is the raw mic level (0..1). The reaction ballistics live in the
-/// pure [AudienceMood] (fast-attack engagement + slow boredom), advanced here by
-/// a frame [Ticker] with real dt so the integrator is stable and in step with
-/// the eye — NOT the jittery audio-chunk rate. [personality] biases how easily
-/// this face engages and how quickly it drifts. The painter is deliberately
-/// dumb: it only draws the mood's [AudienceMood.engage] / [AudienceMood.boredom].
+/// [personality] biases how easily this face engages and how quickly it drifts;
+/// [energy] is the raw mic level (0..1).
 class LaBanca extends StatefulWidget {
-  /// Raw mic level, 0..1. The mood smooths it internally.
   final double energy;
+
+  /// Kept for API compatibility; a tile renders a single reacting face.
   final int faceCount;
   final double height;
-
-  /// This face's disposition (warm / neutral / tough). Defaults to neutral.
   final AudiencePersonality personality;
 
   const LaBanca({
@@ -41,9 +38,8 @@ class LaBanca extends StatefulWidget {
 class _LaBancaState extends State<LaBanca> with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
   late AudienceMood _mood = AudienceMood(personality: widget.personality);
-
   Duration _last = Duration.zero;
-  double _elapsedSec = 0; // drives the idle bob
+  double _elapsed = 0;
 
   @override
   void initState() {
@@ -54,16 +50,14 @@ class _LaBancaState extends State<LaBanca> with SingleTickerProviderStateMixin {
   void _onTick(Duration elapsed) {
     final dt = (elapsed - _last).inMicroseconds / 1e6;
     _last = elapsed;
-    _elapsedSec = elapsed.inMicroseconds / 1e6;
+    _elapsed = elapsed.inMicroseconds / 1e6;
     _mood.advance(widget.energy, dt);
-    if (mounted) setState(() {}); // repaint from the fresh E/B
+    if (mounted) setState(() {});
   }
 
   @override
   void didUpdateWidget(LaBanca old) {
     super.didUpdateWidget(old);
-    // Only the mic level normally changes; rebuild the mood only if the
-    // personality itself is swapped (rare).
     if (old.personality != widget.personality) {
       _mood = AudienceMood(personality: widget.personality);
     }
@@ -75,113 +69,62 @@ class _LaBancaState extends State<LaBanca> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  /// Mood → face. Boredom wins when it's high (they've checked out); otherwise
+  /// engagement sets the smile. The resting face is friendly (🙂), never sad —
+  /// a silent room is waiting, not annoyed.
+  static String _emojiFor(double engage, double boredom) {
+    if (boredom > 0.78) return '😴'; // gone
+    if (boredom > 0.42) return '😐'; // drifting
+    if (engage > 0.72) return '🤩'; // wowed
+    if (engage > 0.42) return '😄'; // into it
+    return '🙂'; // listening / at rest — friendly
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    return CustomPaint(
-      size: Size(double.infinity, widget.height),
-      painter: _BancaPainter(
-        engage: _mood.engage,
-        boredom: _mood.boredom,
-        elapsedSec: _elapsedSec,
-        phaseSeed: widget.personality.phaseSeed,
-        faceCount: widget.faceCount,
-        accent: t.accent,
-        faceFill: t.surface2,
-        ink: t.ink,
+    final e = _mood.engage;
+    final b = _mood.boredom;
+    final emoji = _emojiFor(e, b);
+
+    // Warm lime glow as the face engages; a touch dimmer as it drifts.
+    final tint = Color.lerp(
+      Color.lerp(t.surface2, t.lime.withValues(alpha: 0.30), e)!,
+      t.surface2.withValues(alpha: 0.65),
+      b * 0.5,
+    )!;
+
+    // A gentle idle float, livelier when engaged; phaseSeed desyncs the row.
+    final bob =
+        math.sin(_elapsed * 1.7 + widget.personality.phaseSeed) *
+        (1.2 + e * 2.2);
+
+    return Container(
+      color: tint,
+      alignment: Alignment.center,
+      child: Transform.translate(
+        offset: Offset(0, -bob),
+        child: Transform.scale(
+          scale: 1 + e * 0.12,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeOutBack,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.6, end: 1.0).animate(anim),
+                child: child,
+              ),
+            ),
+            child: Text(
+              emoji,
+              key: ValueKey<String>(emoji),
+              style: TextStyle(fontSize: widget.height * 0.48),
+            ),
+          ),
+        ),
       ),
     );
   }
-}
-
-class _BancaPainter extends CustomPainter {
-  final double engage; // E: 0 = flat, 1 = beaming
-  final double boredom; // B: 0 = rapt, 1 = checked out
-  final double elapsedSec; // wall-clock for the idle bob
-  final double phaseSeed; // per-face desync
-  final int faceCount;
-  final Color accent;
-  final Color faceFill;
-  final Color ink;
-
-  _BancaPainter({
-    required this.engage,
-    required this.boredom,
-    required this.elapsedSec,
-    required this.phaseSeed,
-    required this.faceCount,
-    required this.accent,
-    required this.faceFill,
-    required this.ink,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final slot = size.width / faceCount;
-    final r = math.min(slot, size.height) * 0.32;
-
-    for (var i = 0; i < faceCount; i++) {
-      // ~3 s idle loop; phaseSeed (+ a per-face nudge) breaks the lockstep.
-      final phase = elapsedSec * (2 * math.pi / 3) + phaseSeed + i * 0.9;
-      final bob = math.sin(phase) * (2 + engage * 10);
-      final cx = slot * (i + 0.5);
-      final cy = size.height * 0.55 - bob - engage * 6;
-      _paintFace(canvas, Offset(cx, cy), r, i);
-    }
-  }
-
-  void _paintFace(Canvas canvas, Offset c, double r, int index) {
-    // Head warms toward the accent as this face engages.
-    final warmth = Color.lerp(faceFill, accent.withValues(alpha: 0.25), engage)!;
-    canvas.drawCircle(c, r, Paint()..color = warmth);
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = ink.withValues(alpha: 0.12),
-    );
-
-    // Eyes. Boredom (not silence) slides the gaze away; engagement opens them.
-    final eyeDx = r * 0.42;
-    final eyeDy = -r * 0.15;
-    final gaze = boredom * r * 0.30; // drift aside only when actually bored
-    final eyeR = r * (0.14 + engage * 0.06);
-    final eyePaint = Paint()..color = ink.withValues(alpha: 0.85);
-    canvas.drawCircle(c + Offset(-eyeDx + gaze, eyeDy), eyeR, eyePaint);
-    canvas.drawCircle(c + Offset(eyeDx + gaze, eyeDy), eyeR, eyePaint);
-
-    // Mouth: neutral (flat) at rest, smile from engagement, frown only from
-    // sustained boredom. A silent pause is 0/0 → flat, never sad.
-    final mouth = Path();
-    final mw = r * 0.5;
-    final my = c.dy + r * 0.35;
-    final curve = (engage * 0.9 - boredom * 0.8) * r;
-    mouth.moveTo(c.dx - mw, my);
-    mouth.quadraticBezierTo(c.dx, my + curve, c.dx + mw, my);
-    canvas.drawPath(
-      mouth,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.12
-        ..strokeCap = StrokeCap.round
-        ..color = ink.withValues(alpha: 0.75),
-    );
-
-    // A little excitement spark above a beaming face.
-    if (engage > 0.75 && index.isEven) {
-      canvas.drawCircle(
-        c + Offset(r * 0.9, -r * 1.05),
-        r * 0.1,
-        Paint()..color = accent,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BancaPainter old) =>
-      old.engage != engage ||
-      old.boredom != boredom ||
-      old.elapsedSec != elapsedSec;
 }
