@@ -194,7 +194,12 @@ class _SessionScreenState extends State<SessionScreen> {
   /// than derived from placeholder text.
   Future<({String text, bool trusted})> _transcribe(Uint8List bytes) async {
     if (bytes.lengthInBytes >= 2) {
-      final int16 = bytes.buffer.asInt16List(0, bytes.lengthInBytes ~/ 2);
+      // Trim only the leading/trailing silence before Whisper — that empty edge
+      // is exactly what it hallucinates speech over. Anti-empty guard inside:
+      // a near-silent clip is returned unchanged. The pause VAD and the WPM
+      // denominator still use the ORIGINAL buffer; this touches only the STT.
+      final speech = const PauseDetector().trimSilenceEdges(bytes);
+      final int16 = speech.buffer.asInt16List(0, speech.lengthInBytes ~/ 2);
       final samples = Float32List(int16.length);
       for (var i = 0; i < int16.length; i++) {
         samples[i] = int16[i] / 32768.0;
