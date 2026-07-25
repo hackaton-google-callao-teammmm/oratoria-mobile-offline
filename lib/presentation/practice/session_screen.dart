@@ -21,6 +21,7 @@ import '../../adapters/speech/vosk_live_transcriber.dart';
 import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
 import '../../shared/brand/eq_waveform.dart';
+import '../../shared/characters/audience_mood.dart';
 import '../../shared/characters/la_banca.dart';
 import '../../shared/characters/vox.dart';
 import '../../shared/ui/eyebrow.dart';
@@ -717,15 +718,35 @@ class _AudienceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Three distinct dispositions, warm on the LEFT so a timid child wins one
+    // clearly-engaged face early. Same live energy, different reactions.
     return SizedBox(
       height: 84,
       child: Row(
         children: [
-          Expanded(child: _AudienceTile(energy: energy, tokens: tokens)),
+          Expanded(
+            child: _AudienceTile(
+              energy: energy,
+              tokens: tokens,
+              personality: AudiencePersonality.warm,
+            ),
+          ),
           const SizedBox(width: 10),
-          Expanded(child: _AudienceTile(energy: energy, tokens: tokens)),
+          Expanded(
+            child: _AudienceTile(
+              energy: energy,
+              tokens: tokens,
+              personality: AudiencePersonality.neutral,
+            ),
+          ),
           const SizedBox(width: 10),
-          Expanded(child: _AudienceTile(energy: energy, tokens: tokens)),
+          Expanded(
+            child: _AudienceTile(
+              energy: energy,
+              tokens: tokens,
+              personality: AudiencePersonality.tough,
+            ),
+          ),
         ],
       ),
     );
@@ -738,8 +759,13 @@ class _AudienceRow extends StatelessWidget {
 class _AudienceTile extends StatelessWidget {
   final double energy;
   final AppTokens tokens;
+  final AudiencePersonality personality;
 
-  const _AudienceTile({required this.energy, required this.tokens});
+  const _AudienceTile({
+    required this.energy,
+    required this.tokens,
+    required this.personality,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -754,7 +780,12 @@ class _AudienceTile extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            child: LaBanca(energy: energy, faceCount: 1, height: 84),
+            child: LaBanca(
+              energy: energy,
+              faceCount: 1,
+              height: 84,
+              personality: personality,
+            ),
           ),
           Positioned(
             left: 6,
