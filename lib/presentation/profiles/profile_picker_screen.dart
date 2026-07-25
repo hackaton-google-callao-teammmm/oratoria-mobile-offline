@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/theme_controller.dart';
 import '../../app/theme/tokens.dart';
@@ -50,6 +51,106 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
     if (mounted) _open(created);
   }
 
+  Future<void> _edit(Profile profile) async {
+    await Navigator.of(context).push<Profile>(
+      MaterialPageRoute<Profile>(
+        builder: (_) =>
+            ProfileCreateScreen(store: widget.store, initial: profile),
+      ),
+    );
+    if (mounted) setState(() => _profiles = widget.store.profiles());
+  }
+
+  Future<void> _delete(Profile profile) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final text = Theme.of(sheetContext).textTheme;
+        final scheme = Theme.of(sheetContext).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('¿Eliminar a ${profile.name}?', style: text.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  'Se perderá su progreso guardado.',
+                  style: text.bodyMedium,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            Navigator.of(sheetContext).pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: scheme.error,
+                          foregroundColor: scheme.onError,
+                        ),
+                        onPressed: () =>
+                            Navigator.of(sheetContext).pop(true),
+                        child: const Text('Eliminar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true) return;
+    HapticFeedback.mediumImpact();
+    await widget.store.deleteProfile(profile.id);
+    if (mounted) setState(() => _profiles = widget.store.profiles());
+  }
+
+  Future<void> _showActions(Profile profile) async {
+    HapticFeedback.selectionClick();
+    final action = await showModalBottomSheet<_ProfileAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Editar perfil'),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_ProfileAction.edit),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Eliminar perfil'),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_ProfileAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _ProfileAction.edit:
+        await _edit(profile);
+      case _ProfileAction.delete:
+        await _delete(profile);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -74,8 +175,20 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                         childAspectRatio: 0.82,
                         children: [
                           for (final p in _profiles)
-                            _ProfileTile(profile: p, onTap: () => _open(p)),
-                          _AddTile(onTap: _create),
+                            _ProfileTile(
+                              profile: p,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                _open(p);
+                              },
+                              onLongPress: () => _showActions(p),
+                            ),
+                          _AddTile(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              _create();
+                            },
+                          ),
                         ],
                       ),
               ),
@@ -90,19 +203,25 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
 class _ProfileTile extends StatelessWidget {
   final Profile profile;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  const _ProfileTile({required this.profile, required this.onTap});
+  const _ProfileTile({
+    required this.profile,
+    required this.onTap,
+    required this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AvatarBubble(emoji: profile.avatarKey, size: 76),
+          AvatarHero(tag: profile.id, emoji: profile.avatarKey, size: 76),
           const SizedBox(height: 8),
           Text(
             profile.name,
@@ -174,3 +293,5 @@ class _EmptyHint extends StatelessWidget {
     );
   }
 }
+
+enum _ProfileAction { edit, delete }

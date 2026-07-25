@@ -52,6 +52,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     final t = AppTokens.of(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
+      fit: StackFit.expand,
       children: [
         Positioned.fill(
           child: RepaintBoundary(

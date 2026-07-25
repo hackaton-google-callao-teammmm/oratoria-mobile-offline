@@ -11,6 +11,7 @@ import '../../shared/ui/pill_button.dart';
 import '../benchmark/benchmark_screen.dart';
 import '../home/home_screen.dart';
 import '../progress/progress_screen.dart';
+import '../profiles/profile_picker_screen.dart';
 
 /// INICIO — the hub (Flujo, mapa). Vox welcomes the child by name; one big
 /// "Practicar" button leads into the session, plus "Mi progreso". The dev
@@ -54,6 +55,19 @@ class HubScreen extends StatelessWidget {
     );
   }
 
+  void _switchProfile(BuildContext context) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfilePickerScreen(
+          store: store,
+          themeController: themeController,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -66,13 +80,29 @@ class HubScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    AvatarBubble(emoji: profile.avatarKey, size: 40),
-                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        profile.name,
-                        style: text.titleMedium,
-                        overflow: TextOverflow.ellipsis,
+                      // Long-press the avatar/name to switch profile — same
+                      // hidden-affordance pattern as long-pressing Vox below.
+                      child: GestureDetector(
+                        onLongPress: () => _switchProfile(context),
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          children: [
+                            AvatarHero(
+                              tag: profile.id,
+                              emoji: profile.avatarKey,
+                              size: 40,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                profile.name,
+                                style: text.titleMedium,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     ValueListenableBuilder<ThemeMode>(
@@ -117,6 +147,12 @@ class HubScreen extends StatelessWidget {
                 const Spacer(),
                 PillButton(
                   label: 'Practicar',
+                  labels: const [
+                    'Practicar',
+                    '¡Vamos!',
+                    'Tu turno',
+                    'A hablar',
+                  ],
                   icon: Icons.mic_rounded,
                   onPressed: () => _practice(context),
                 ),
