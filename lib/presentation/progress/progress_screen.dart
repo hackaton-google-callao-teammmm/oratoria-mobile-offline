@@ -21,36 +21,55 @@ class ProgressScreen extends StatelessWidget {
     final results = store.resultsFor(profile.id);
     final totalStars = results.fold<int>(0, (s, r) => s + r.stars);
 
+    // One scroll view for every state — a ListView always lays out under the
+    // aurora's loose constraints, so the screen is never a blank canvas.
     return Scaffold(
       body: AuroraBackground(
         child: SafeArea(
-          child: results.isEmpty
-              ? _Empty()
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.arrow_back),
-                        ),
-                        const SizedBox(width: 4),
-                        Text('Mi progreso', style: text.headlineMedium),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _Summary(sessions: results.length, stars: totalStars),
-                    const SizedBox(height: 24),
-                    const Eyebrow('Tus prácticas'),
-                    const SizedBox(height: 12),
-                    for (final r in results) _ResultRow(result: r),
-                  ],
-                ),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                  const SizedBox(width: 4),
+                  Text('Mi progreso', style: text.headlineMedium),
+                ],
+              ),
+              if (results.isEmpty) ...[
+                const SizedBox(height: 72),
+                _EmptyBlock(onPractice: () => Navigator.of(context).pop()),
+              ] else ...[
+                const SizedBox(height: 16),
+                _Summary(sessions: results.length, stars: totalStars),
+                const SizedBox(height: 24),
+                const Eyebrow('Tus prácticas'),
+                const SizedBox(height: 12),
+                for (final r in results) _ResultRow(result: r),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// Relative day label for a saved result ("Hoy", "Ayer", "Hace 3 días").
+String _relativeDay(int atMillis) {
+  final now = DateTime.now();
+  final then = DateTime.fromMillisecondsSinceEpoch(atMillis);
+  final days = DateTime(now.year, now.month, now.day)
+      .difference(DateTime(then.year, then.month, then.day))
+      .inDays;
+  if (days <= 0) return 'Hoy';
+  if (days == 1) return 'Ayer';
+  if (days < 7) return 'Hace $days días';
+  if (days < 14) return 'Hace 1 semana';
+  return 'Hace ${days ~/ 7} semanas';
 }
 
 class _Summary extends StatelessWidget {
@@ -139,21 +158,35 @@ class _ResultRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final text = Theme.of(context).textTheme;
     final exercise = ExerciseCatalog.byId(result.exerciseId);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: t.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(AppRadius.chip + 4),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: t.line),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              exercise?.title ?? 'Práctica',
-              style: Theme.of(context).textTheme.titleMedium,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(exercise?.title ?? 'Práctica', style: text.titleMedium),
+                const SizedBox(height: 2),
+                // When it happened — so "Mi progreso" reads as a timeline.
+                Text(
+                  _relativeDay(result.atMillis),
+                  style: TextStyle(
+                    fontFamily: AppFonts.mono,
+                    fontSize: 11,
+                    color: t.inkFaint,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
             ),
           ),
           Row(
@@ -174,34 +207,54 @@ class _ResultRow extends StatelessWidget {
   }
 }
 
-class _Empty extends StatelessWidget {
+/// Empty state — shown when the profile has no practices yet. Built from plain
+/// widgets (no Image.asset, no Expanded) so it renders reliably in-list on any
+/// device, and uses the theme's own display scale for a crafted, on-brand feel.
+class _EmptyBlock extends StatelessWidget {
+  final VoidCallback onPractice;
+
+  const _EmptyBlock({required this.onPractice});
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // The brand isotype instead of a generic emoji.
-            Image.asset(
-              dark
-                  ? 'assets/brand/OratorIA-isotype-inverted-1024.png'
-                  : 'assets/brand/OratorIA-isotype-1024.png',
-              width: 84,
-              height: 84,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Aún no has practicado.\n¡Tu primera práctica aparecerá aquí!',
-              textAlign: TextAlign.center,
-              style: text.titleMedium,
-            ),
-          ],
+    final t = AppTokens.of(context);
+    return Column(
+      children: [
+        Container(
+          width: 104,
+          height: 104,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: t.accent.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+            border: Border.all(color: t.accent.withValues(alpha: 0.28)),
+          ),
+          child: Icon(Icons.mic_none_rounded, size: 46, color: t.accent),
         ),
-      ),
+        const SizedBox(height: 24),
+        Text(
+          'Aún no hay progreso',
+          textAlign: TextAlign.center,
+          style: text.displaySmall,
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'Cuando hagas tu primera práctica, aquí verás tus estrellas '
+            'y cómo vas mejorando, sesión a sesión.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: t.inkSoft, height: 1.45),
+          ),
+        ),
+        const SizedBox(height: 28),
+        FilledButton.icon(
+          onPressed: onPractice,
+          icon: const Icon(Icons.mic_rounded),
+          label: const Text('Empezar a practicar'),
+        ),
+      ],
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:oratoria_core/oratoria_core.dart';
 import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
 import '../../shared/brand/aurora_background.dart';
+import '../../shared/ui/eyebrow.dart';
 import '../../shared/ui/glass_card.dart';
 import '../practice/session_screen.dart';
 
@@ -49,11 +50,17 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.only(left: 12),
+                child: Eyebrow('Tus retos · 5'),
+              ),
               const SizedBox(height: 16),
-              for (final exercise in ExerciseCatalog.all) ...[
+              for (var i = 0; i < ExerciseCatalog.all.length; i++) ...[
                 _ExerciseCard(
-                  exercise: exercise,
-                  onTap: () => _runPractice(context, exercise),
+                  exercise: ExerciseCatalog.all[i],
+                  index: i + 1,
+                  onTap: () => _runPractice(context, ExerciseCatalog.all[i]),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -65,29 +72,31 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Icon + accent per target skill, so the list reads like a colourful set of
-/// distinct challenges rather than five identical rows.
-({IconData icon, Color color}) _skillStyle(TargetSkill s, AppTokens t) {
-  return switch (s) {
-    TargetSkill.pace => (icon: Icons.speed_rounded, color: t.accent),
-    TargetSkill.fillers => (icon: Icons.air_rounded, color: const Color(0xFF2DD4BF)),
-    TargetSkill.eyeContact => (icon: Icons.visibility_rounded, color: const Color(0xFF6C8CFF)),
-    TargetSkill.posture => (icon: Icons.accessibility_new_rounded, color: const Color(0xFFB4761F)),
-    TargetSkill.none => (icon: Icons.auto_awesome_rounded, color: const Color(0xFFA78BFA)),
-  };
-}
+/// The skill a challenge trains, as a mono eyebrow label — an editorial brand
+/// device instead of a colour-coded chip. One confident accent, no rainbow.
+String _skillLabel(TargetSkill s) => switch (s) {
+      TargetSkill.pace => 'Ritmo',
+      TargetSkill.fillers => 'Muletillas',
+      TargetSkill.eyeContact => 'Mirada',
+      TargetSkill.posture => 'Postura',
+      TargetSkill.none => 'Libre',
+    };
 
 class _ExerciseCard extends StatelessWidget {
   final Exercise exercise;
+  final int index;
   final VoidCallback onTap;
 
-  const _ExerciseCard({required this.exercise, required this.onTap});
+  const _ExerciseCard({
+    required this.exercise,
+    required this.index,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
     final text = Theme.of(context).textTheme;
-    final skill = _skillStyle(exercise.targetSkill, t);
 
     return GlassCard(
       onTap: onTap,
@@ -95,33 +104,33 @@ class _ExerciseCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: skill.color.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(skill.icon, color: skill.color, size: 24),
+              // Editorial index in mono — distinguishes challenges by
+              // typography, not by a colour-coded chip.
+              Text(
+                index.toString().padLeft(2, '0'),
+                style: monoFigure(color: t.accent, size: 26),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
-                child: Text(exercise.title, style: text.titleLarge),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: t.surface2,
-                  borderRadius: BorderRadius.circular(999),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Eyebrow(_skillLabel(exercise.targetSkill)),
+                    const SizedBox(height: 2),
+                    Text(exercise.title, style: text.titleLarge),
+                  ],
                 ),
-                child: Text(
-                  '${exercise.targetDuration.inSeconds}s',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: t.inkSoft,
-                  ),
+              ),
+              const SizedBox(width: 10),
+              // Duration as tabular data, not a pill badge.
+              Text(
+                '${exercise.targetDuration.inSeconds}s',
+                style: TextStyle(
+                  fontFamily: AppFonts.mono,
+                  fontSize: 13,
+                  color: t.inkFaint,
                 ),
               ),
             ],
@@ -129,21 +138,21 @@ class _ExerciseCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(exercise.prompt, style: text.bodyMedium),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.tips_and_updates_rounded, size: 16, color: skill.color),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  exercise.targetHint,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    color: t.inkFaint,
+          // A quiet accent rule + the hint, upright (no italic) for contrast.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 2, color: t.accent.withValues(alpha: 0.5)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    exercise.targetHint,
+                    style: TextStyle(fontSize: 13, color: t.inkSoft, height: 1.35),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

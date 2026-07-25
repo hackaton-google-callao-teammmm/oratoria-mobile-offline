@@ -32,6 +32,29 @@ void main() {
     });
   });
 
+  group('repetition loops (Whisper stuck)', () {
+    test('drops a repeated-phrase loop to empty', () {
+      // The exact failure seen on device: one phrase repeated many times.
+      final loop = ('y en el momento de 50 ' * 30).trim();
+      expect(cleanTranscript(loop), isEmpty);
+      expect(isLikelyHallucination(loop), isTrue);
+    });
+
+    test('keeps a long, lexically diverse real transcript', () {
+      const real =
+          'Hola a todos, hoy quiero contarles sobre mi perro Rocky. Le encanta '
+          'correr en el parque, perseguir la pelota y saludar a la gente con '
+          'mucha energía cada mañana temprano.';
+      expect(cleanTranscript(real), isNotEmpty);
+      expect(isLikelyHallucination(real), isFalse);
+    });
+
+    test('does not flag a short natural repetition', () {
+      // Short and human — must not be mistaken for a loop.
+      expect(isLikelyHallucination('no no no lo sé, ya voy'), isFalse);
+    });
+  });
+
   group('isLikelyHallucination', () {
     test('flags silence artifacts', () {
       expect(isLikelyHallucination('[Música]'), isTrue);

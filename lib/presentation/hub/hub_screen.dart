@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/theme/theme_controller.dart';
-import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
 import '../../shared/avatars.dart';
 import '../../shared/brand/aurora_background.dart';
+import '../../shared/brand/eq_waveform.dart';
 import '../../shared/characters/vox.dart';
 import '../../shared/ui/pill_button.dart';
 import '../benchmark/benchmark_screen.dart';
@@ -65,7 +65,6 @@ class HubScreen extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const _OfflineBadge(),
                     ValueListenableBuilder<ThemeMode>(
                       valueListenable: themeController,
                       builder: (context, mode, _) => IconButton(
@@ -102,6 +101,9 @@ class HubScreen extends StatelessWidget {
                   style: text.displaySmall?.copyWith(height: 1.15),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 18),
+                // Signature voice motif — the brand eq bars, calm at rest.
+                EqWaveform(energy: 0.4, height: 26, barWidth: 6),
                 const Spacer(),
                 PillButton(
                   label: 'Practicar',
@@ -126,35 +128,3 @@ class HubScreen extends StatelessWidget {
   }
 }
 
-class _OfflineBadge extends StatelessWidget {
-  const _OfflineBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-    // Reframed as a feature, not a lack: on-device AI is the headline.
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-      decoration: BoxDecoration(
-        color: t.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: t.accent.withValues(alpha: 0.30)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.bolt_rounded, size: 14, color: t.accent),
-          const SizedBox(width: 5),
-          Text(
-            'En tu dispositivo',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: t.accent,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

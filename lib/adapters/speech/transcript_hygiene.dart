@@ -45,9 +45,32 @@ String cleanTranscript(String raw) {
     }
   }
 
-  return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+  s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  // Whisper (especially tiny) gets stuck in a repetition loop on audio it can't
+  // parse — "...y en el momento de 50 y en el momento de 50 y..." dozens of
+  // times. That is not real speech; drop it so no fabricated pace or transcript
+  // is ever shown as if the child said it.
+  if (_isRepetitionLoop(s)) return '';
+
+  return s;
+}
+
+/// Detects the Whisper repetition-loop failure: a handful of words repeated
+/// many times, collapsing lexical diversity far below natural speech.
+bool _isRepetitionLoop(String s) {
+  final words = s
+      .toLowerCase()
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty)
+      .toList();
+  // Too short to tell a loop from a normal repeated word ("no no no").
+  if (words.length < 16) return false;
+  final diversity = words.toSet().length / words.length;
+  // Natural speech runs ~0.5–0.9 unique/total; a loop collapses under ~0.2.
+  return diversity < 0.30;
 }
 
 /// True when nothing real survives cleaning — the transcript was almost
-/// certainly Whisper talking to itself over silence.
+/// certainly Whisper talking to itself (silence artifacts or a repetition loop).
 bool isLikelyHallucination(String raw) => cleanTranscript(raw).isEmpty;
