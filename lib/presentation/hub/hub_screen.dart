@@ -78,7 +78,11 @@ class HubScreen extends StatelessWidget {
                         behavior: HitTestBehavior.opaque,
                         child: Row(
                           children: [
-                            AvatarBubble(emoji: profile.avatarKey, size: 40),
+                            AvatarHero(
+                              tag: profile.id,
+                              emoji: profile.avatarKey,
+                              size: 40,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(

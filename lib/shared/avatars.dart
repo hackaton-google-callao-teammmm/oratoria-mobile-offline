@@ -45,3 +45,36 @@ class AvatarBubble extends StatelessWidget {
     );
   }
 }
+
+/// [AvatarBubble] wrapped in a [Hero], for the profile picker → hub
+/// transition (same profile, different size). `FittedBox` in the shuttle
+/// avoids the raw size-tween distortion Hero shows by default when the two
+/// endpoints have different sizes.
+class AvatarHero extends StatelessWidget {
+  final String tag;
+  final String emoji;
+  final double size;
+  final bool selected;
+
+  const AvatarHero({
+    super.key,
+    required this.tag,
+    required this.emoji,
+    this.size = 64,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Hero(
+      tag: tag,
+      flightShuttleBuilder: (_, _, direction, fromCtx, toCtx) {
+        final hero =
+            (direction == HeroFlightDirection.push ? toCtx.widget : fromCtx.widget)
+                as Hero;
+        return FittedBox(fit: BoxFit.contain, child: hero.child);
+      },
+      child: AvatarBubble(emoji: emoji, size: size, selected: selected),
+    );
+  }
+}

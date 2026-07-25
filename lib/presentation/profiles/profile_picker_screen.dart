@@ -221,7 +221,7 @@ class _ProfileTile extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AvatarBubble(emoji: profile.avatarKey, size: 76),
+          AvatarHero(tag: profile.id, emoji: profile.avatarKey, size: 76),
           const SizedBox(height: 8),
           Text(
             profile.name,
