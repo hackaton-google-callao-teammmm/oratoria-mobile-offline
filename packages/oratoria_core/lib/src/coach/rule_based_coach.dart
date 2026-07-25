@@ -38,6 +38,7 @@ class RuleBasedCoach implements CoachFeedbackGenerator {
     required Exercise exercise,
     bool voiceTrusted = true,
     bool pausesTrusted = true,
+    String? transcript, // unused: the rule-based coach never reads content.
   }) async {
     // Only judge signals we actually measured. Pace and fillers come from the
     // transcript, so they're off when the STT wasn't trusted; pauses come from
@@ -106,6 +107,7 @@ class RuleBasedCoach implements CoachFeedbackGenerator {
       exercise: exercise,
       voiceTrusted: voiceTrusted,
       pausesTrusted: pausesTrusted,
+      transcript: transcript,
     );
     // No real profiling without Gemma, but a null/empty profile must still
     // flip to non-empty after the first practice — otherwise

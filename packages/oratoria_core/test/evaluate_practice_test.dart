@@ -10,6 +10,7 @@ class _ExplodingCoach implements CoachFeedbackGenerator {
     required Exercise exercise,
     bool voiceTrusted = true,
     bool pausesTrusted = true,
+    String? transcript,
   }) async {
     throw StateError('out of memory');
   }
@@ -42,6 +43,7 @@ class _FakeLlmCoach implements CoachFeedbackGenerator {
     required Exercise exercise,
     bool voiceTrusted = true,
     bool pausesTrusted = true,
+    String? transcript,
   }) async =>
       const CoachFeedback(
         strengthDimension: Dimension.pace,

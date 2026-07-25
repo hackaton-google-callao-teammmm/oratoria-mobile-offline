@@ -252,12 +252,19 @@ class _SessionScreenState extends State<SessionScreen> {
       await VoskLiveTranscriber.instance.stop();
     }
 
+    // Unmount the camera preview widget FIRST before disposing the controller.
+    // Disposing the CameraController while CameraPreview is active in the tree
+    // causes CameraPreview's internal ValueListenableBuilder to rebuild and invoke
+    // buildPreview() on a disposed controller, throwing CameraException.
+    final bodyAnalyzer = _body;
+    _body = null;
+    _bodyOn = false;
+    setState(() => _phase = _Phase.thinking);
+
     // Stop the camera and collect the body aggregate (BodyMetrics.none if it
     // never ran or saw no face — the report then simply omits body language).
-    final body = _body == null ? BodyMetrics.none : await _body!.stop();
-    _body = null;
+    final body = bodyAnalyzer == null ? BodyMetrics.none : await bodyAnalyzer.stop();
 
-    setState(() => _phase = _Phase.thinking);
 
     // Vox "thinks" — this beat masks the on-device work. Everything here is
     // guarded so the session never breaks, and only honestly measured signals
@@ -301,6 +308,12 @@ class _SessionScreenState extends State<SessionScreen> {
       );
     }
 
+    // Same honesty gate as the report/coach: pace and fillers are only real
+    // when the transcript was trusted STT and substantial — never persisted
+    // from placeholder text, so "progress-impact-indicators" never invents
+    // a trend from an untrusted run.
+    final voiceHonest = result.voiceTextTrusted && result.voice.isMeaningful;
+
     // Persist the result for "Mi progreso" (fire-and-forget; never blocks the
     // beat). Timestamp comes from timestamp() since Date.now is unavailable.
     await widget.store.saveResult(
@@ -310,6 +323,8 @@ class _SessionScreenState extends State<SessionScreen> {
         score: result.score,
         stars: result.stars,
         atMillis: DateTime.timestamp().millisecondsSinceEpoch,
+        wordsPerMinute: voiceHonest ? result.voice.wordsPerMinute : null,
+        fillerRate: voiceHonest ? result.voice.fillerRate : null,
       ),
     );
 

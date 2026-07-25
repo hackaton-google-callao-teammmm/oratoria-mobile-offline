@@ -10,11 +10,12 @@ abstract final class FeatureFlags {
   /// Live speech caption during EXPONIENDO — shows the child's words as they
   /// speak, via on-device Vosk streaming STT (offline).
   ///
-  /// OFF by default: it must not ship until the RAM cost of running Vosk
-  /// alongside a resident Gemma and the camera has been measured on the A12.
+  /// ON: shipped directly without a prior RAM measurement (same call made
+  /// for [gemmaFeedback] — confirmed working on the target device, revert if
+  /// real memory problems show up running Vosk + Gemma + camera together).
   /// The caption is purely cosmetic — it NEVER feeds the report, which stays on
   /// the final Whisper pass and the trust flags.
-  static const bool liveCaption = false;
+  static const bool liveCaption = true;
 
   /// Let Gemma rewrite the WORDING of the coach feedback so it stops sounding
   /// like a template. The rule-based coach still OWNS the verdict (which

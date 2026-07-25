@@ -197,6 +197,99 @@ void main() {
     expect(profileChallenge, contains('dinosaurio'));
   });
 
+  test('generate() includes the real transcript in the prompt when trusted',
+      () async {
+    String? capturedPrompt;
+    final coach = GemmaCoach(rewrite: (prompt) async {
+      capturedPrompt = prompt;
+      return null; // fall back — this test only cares about the prompt sent
+    });
+
+    await coach.generate(
+      voice: _voice(),
+      body: BodyMetrics.none,
+      exercise: Exercise.free,
+      transcript: 'me gustan mucho los dinosaurios',
+    );
+
+    expect(capturedPrompt, contains('dinosaurios'));
+  });
+
+  test('generate() never sends the transcript when untrusted', () async {
+    String? capturedPrompt;
+    final coach = GemmaCoach(rewrite: (prompt) async {
+      capturedPrompt = prompt;
+      return null;
+    });
+
+    await coach.generate(
+      voice: _voice(),
+      body: const BodyMetrics(
+        eyeContactRatio: 0.9,
+        smileRatio: 0.5,
+        uprightRatio: 0.8,
+        framesAnalyzed: 400,
+      ),
+      exercise: Exercise.free,
+      voiceTrusted: false,
+      transcript: 'me gustan mucho los dinosaurios',
+    );
+
+    // voiceTrusted: false means generate() returns the base feedback before
+    // ever calling _rewrite — no prompt should have been built at all.
+    expect(capturedPrompt, isNull);
+  });
+
+  test('the verdict never changes even when the transcript is included',
+      () async {
+    final base = await rule.generate(
+      voice: _voice(),
+      body: BodyMetrics.none,
+      exercise: Exercise.free,
+    );
+    final coach = GemmaCoach(
+      rewrite: (_) async =>
+          'FORTALEZA: Contaste muy bien lo de los dinosaurios.\n'
+          'MEJORA: Baja un poco el ritmo la próxima vez.',
+    );
+
+    final out = await coach.generate(
+      voice: _voice(),
+      body: BodyMetrics.none,
+      exercise: Exercise.free,
+      transcript: 'me gustan mucho los dinosaurios',
+    );
+
+    expect(out.strengthBody, contains('dinosaurios'));
+    expect(out.strengthDimension, base.strengthDimension);
+    expect(out.improvementDimension, base.improvementDimension);
+    expect(out.strengthTitle, base.strengthTitle);
+    expect(out.improvementTitle, base.improvementTitle);
+    expect(out.goalMet, base.goalMet);
+  });
+
+  test('generateWithProfile forwards the transcript into the feedback rewrite',
+      () async {
+    String? capturedFeedbackPrompt;
+    final coach = GemmaCoach(rewrite: (prompt) async {
+      if (prompt.contains('FORTALEZA')) capturedFeedbackPrompt = prompt;
+      if (prompt.contains('FORTALEZA')) {
+        return 'FORTALEZA: x\nMEJORA: y';
+      }
+      return '{"interests":[]}';
+    });
+
+    await coach.generateWithProfile(
+      voice: _voice(),
+      body: BodyMetrics.none,
+      exercise: Exercise.free,
+      aiProfile: '{}',
+      transcript: 'me gustan mucho los dinosaurios',
+    );
+
+    expect(capturedFeedbackPrompt, contains('dinosaurios'));
+  });
+
   test('generateWithProfile extracts updated profile JSON', () async {
     final coach = GemmaCoach(rewrite: (prompt) async {
       if (prompt.contains('FORTALEZA')) {

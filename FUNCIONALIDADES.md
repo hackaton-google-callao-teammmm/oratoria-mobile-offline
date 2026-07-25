@@ -55,7 +55,12 @@ Orden real de los pasos:
 | 🧠 **Lenguaje**             | **Gemma 3 1B** genera la repregunta del público                | ✅                      |
 
 Modelos: Gemma 3 1B q4 (529 MB) y Whisper tiny int8 (~99 MB) se cargan por
-`adb push` (sideload); ML Kit y el runtime de sherpa viajan **dentro del APK**.
+`adb push` (sideload) a `Android/data/pe.oratoria.oratoria_kids/files/` — muy
+grandes para el APK. **Vosk `vosk-model-small-es-0.42`** (subtítulos en vivo,
+~38 MB) en cambio va **bundleado como asset** (`assets/models/`) y se
+descomprime solo (una vez) al almacenamiento de la app vía `ModelLoader` de
+`vosk_flutter_2` — funciona de fábrica, sin sideload. ML Kit y el runtime de
+sherpa viajan **dentro del APK**.
 
 ---
 
@@ -172,6 +177,7 @@ Degradaciones diseñadas (no "por si acaso"):
 | **RAM con las 3 modalidades juntas**                  | al borde en el A12 (available baja a ~90 MB en el pico), pero **sin matar la app**: soak de ~5-6 sesiones seguidas, pid estable, RAM se recupera a ~530 MB |
 | **Confirmación offline estricta**                     | falta modo avión + instalación fresca para el 100%                                                                                                         |
 | **Postura (Pose Detection)**                          | fuera de alcance (candidato a OOM); solo mirada + sonrisa                                                                                                  |
+| **Subtítulos en vivo (Vosk)**                          | ✅ el modelo va bundleado como asset (ya no depende de `adb push`); falta probar el primer arranque en el A12 real, donde se descomprime una sola vez         |
 
 ---
 

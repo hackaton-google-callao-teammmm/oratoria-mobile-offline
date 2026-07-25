@@ -69,6 +69,7 @@ class GemmaCoach implements CoachFeedbackGenerator {
       exercise: exercise,
       voiceTrusted: voiceTrusted,
       pausesTrusted: pausesTrusted,
+      transcript: transcript,
     );
 
     if (transcript == null || transcript.trim().isEmpty) {
@@ -123,6 +124,7 @@ class GemmaCoach implements CoachFeedbackGenerator {
     required Exercise exercise,
     bool voiceTrusted = true,
     bool pausesTrusted = true,
+    String? transcript,
   }) async {
     final base = await _base.generate(
       voice: voice,
@@ -133,11 +135,12 @@ class GemmaCoach implements CoachFeedbackGenerator {
     );
 
     // Only personalise honest, substantial runs. For an untrusted or too-short
-    // run the rule coach already returned an encouragement — leave it exactly.
+    // run the rule coach already returned an encouragement — leave it exactly,
+    // and never even build a prompt with the transcript in it.
     if (!voiceTrusted || !voice.isMeaningful) return base;
 
     try {
-      final raw = await _rewrite(_prompt(exercise, base));
+      final raw = await _rewrite(_prompt(exercise, base, transcript));
       final parsed = _parse(raw);
       if (parsed == null) return base;
 
@@ -157,17 +160,28 @@ class GemmaCoach implements CoachFeedbackGenerator {
     }
   }
 
-  String _prompt(Exercise exercise, CoachFeedback base) =>
-      'Eres Vox, un entrenador de oratoria cálido para niños de 9 a 15 años. '
-      'Reescribe estos dos mensajes con tus propias palabras, en español neutro, '
-      'cercano y alentador. NO cambies el significado ni los números, y no '
-      'regañes. Cada mensaje: 2 frases cortas.\n\n'
-      'Reto: ${exercise.title}\n'
-      'FORTALEZA (original): ${base.strengthBody}\n'
-      'MEJORA (original): ${base.improvementBody}\n\n'
-      'Responde EXACTAMENTE en este formato, sin nada más:\n'
-      'FORTALEZA: <texto>\n'
-      'MEJORA: <texto>';
+  /// [transcript] is only ever passed in when the run is trusted and
+  /// meaningful (see [generate]) — never a reason to invent a verdict, only
+  /// a chance to make the wording reference something the child actually
+  /// said. The instruction to keep the verdict/numbers untouched already
+  /// covers this; adding the transcript never changes what it may rewrite.
+  String _prompt(Exercise exercise, CoachFeedback base, String? transcript) {
+    final trimmed = transcript?.trim() ?? '';
+    final contentLine =
+        trimmed.isEmpty ? '' : 'Esto fue lo que dijo el niño: "$trimmed"\n';
+    return 'Eres Vox, un entrenador de oratoria cálido para niños de 9 a 15 años. '
+        'Reescribe estos dos mensajes con tus propias palabras, en español neutro, '
+        'cercano y alentador. NO cambies el significado ni los números, y no '
+        'regañes. Cada mensaje: 2 frases cortas. Si es natural, referencia algo '
+        'concreto de lo que dijo el niño, sin inventar nada que no haya dicho.\n\n'
+        'Reto: ${exercise.title}\n'
+        '$contentLine'
+        'FORTALEZA (original): ${base.strengthBody}\n'
+        'MEJORA (original): ${base.improvementBody}\n\n'
+        'Responde EXACTAMENTE en este formato, sin nada más:\n'
+        'FORTALEZA: <texto>\n'
+        'MEJORA: <texto>';
+  }
 
   /// Pulls the two rewritten bodies out of the model's reply. Returns null (→
   /// rule-based fallback) when either is missing/empty, or when a body still

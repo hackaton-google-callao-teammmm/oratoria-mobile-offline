@@ -4,6 +4,7 @@ import 'package:oratoria_core/oratoria_core.dart';
 
 import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
+import '../../data/progress_impact.dart';
 import '../../shared/brand/aurora_background.dart';
 import '../../shared/ui/eyebrow.dart';
 
@@ -73,7 +74,11 @@ class ProgressScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 const Eyebrow('Tus prácticas'),
                 const SizedBox(height: 12),
-                for (final r in results) _ResultRow(result: r),
+                for (var i = 0; i < results.length; i++)
+                  _ResultRow(
+                    result: results[i],
+                    impacts: compareToPrevious(results, i),
+                  ),
               ],
             ],
           ),
@@ -180,8 +185,9 @@ class _Stat extends StatelessWidget {
 
 class _ResultRow extends StatefulWidget {
   final SavedResult result;
+  final List<ProgressImpact> impacts;
 
-  const _ResultRow({required this.result});
+  const _ResultRow({required this.result, this.impacts = const []});
 
   @override
   State<_ResultRow> createState() => _ResultRowState();
@@ -243,6 +249,14 @@ class _ResultRowState extends State<_ResultRow> {
                         letterSpacing: 0.4,
                       ),
                     ),
+                    for (final i in widget.impacts)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          describeImpact(i),
+                          style: TextStyle(fontSize: 12, color: t.inkSoft),
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -1,8 +1,57 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oratoria_kids/data/local_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('SavedResult round-trips wordsPerMinute and fillerRate', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    await store.saveResult(
+      'p1',
+      const SavedResult(
+        exerciseId: 'e-animal',
+        score: 85,
+        stars: 4,
+        atMillis: 100,
+        wordsPerMinute: 118,
+        fillerRate: 3.5,
+      ),
+    );
+
+    final saved = store.resultsFor('p1').single;
+    expect(saved.wordsPerMinute, 118);
+    expect(saved.fillerRate, 3.5);
+  });
+
+  test('SavedResult defaults wordsPerMinute/fillerRate to null when omitted',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    await store.saveResult(
+      'p1',
+      const SavedResult(exerciseId: 'e-animal', score: 85, stars: 4, atMillis: 100),
+    );
+
+    final saved = store.resultsFor('p1').single;
+    expect(saved.wordsPerMinute, isNull);
+    expect(saved.fillerRate, isNull);
+  });
+
+  test('SavedResult.fromJson tolerates old records missing the new fields',
+      () async {
+    // Simulates a practice saved before this change shipped — no 'wpm'/'fr'
+    // keys at all in the persisted JSON.
+    final old = SavedResult.fromJson(
+      jsonDecode('{"e":"e-animal","s":80,"st":4,"t":50}') as Map<String, dynamic>,
+    );
+
+    expect(old.wordsPerMinute, isNull);
+    expect(old.fillerRate, isNull);
+    expect(old.exerciseId, 'e-animal');
+  });
+
   test('updateProfile changes name/avatar but keeps the same id', () async {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore(await SharedPreferences.getInstance());

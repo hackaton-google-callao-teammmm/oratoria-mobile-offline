@@ -64,7 +64,51 @@ void main() {
     expect(find.text('TUS PRÁCTICAS'), findsOneWidget);
     expect(find.text('Hoy'), findsOneWidget);
   });
+
+  testWidgets(
+      'shows a per-row impact comparison against the prior confiable practice',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    const profile = Profile(id: 'p1', name: 'Ana', avatarKey: 'fox');
+
+    await store.saveResult(
+      profile.id,
+      const SavedResult(
+        exerciseId: 'e-libre',
+        score: 60,
+        stars: 3,
+        atMillis: 50,
+        wordsPerMinute: 95,
+        fillerRate: 6,
+      ),
+    );
+    await store.saveResult(
+      profile.id,
+      const SavedResult(
+        exerciseId: 'e-libre',
+        score: 70,
+        stars: 3,
+        atMillis: 100,
+        wordsPerMinute: 118,
+        fillerRate: 3,
+      ),
+    );
+
+    tester.view.physicalSize = const Size(1200, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: ProgressScreen(profile: profile, store: store)),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    // The newest row (118/3) compares against the older one (95/6); the
+    // oldest row has nothing older to compare against, so it shows nothing
+    // extra for it.
+    expect(find.textContaining('de 95 a 118'), findsOneWidget);
+    expect(find.textContaining('de 6 a 3'), findsOneWidget);
+  });
 }
-
-
-
