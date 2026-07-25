@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oratoria_core/oratoria_core.dart';
 import 'package:test/test.dart';
 
@@ -287,16 +289,86 @@ void main() {
       expect(updated!.trim(), isNotEmpty);
     });
 
-    test('leaves an already-populated aiProfile untouched', () async {
+    test(
+        'enriches an already-populated aiProfile preserving existing interests',
+        () async {
+      // The new behaviour is to keep folding this run's signals onto the
+      // profile every time, not to freeze it after the first write. With no
+      // transcript this run, the existing interest must survive untouched,
+      // while strengths/weaknesses get (re)filled from the metrics.
       const existing = '{"interests":["dinosaurios"]}';
       final (_, updated) = await coach.generateWithProfile(
-        voice: voice(),
+        voice: voice(), // wpm 130, no fillers, no awkward pauses
         body: BodyMetrics.none,
         exercise: Exercise.free,
         aiProfile: existing,
       );
 
-      expect(updated, existing);
+      final profile = jsonDecode(updated!) as Map<String, dynamic>;
+      expect(profile['interests'], ['dinosaurios']);
+      expect(
+        (profile['strengths'] as List).cast<String>(),
+        containsAll(<String>[
+          'Habla con buen ritmo',
+          'Habla claro, sin muletillas',
+          'Mantiene el hilo sin silencios largos',
+        ]),
+      );
+      expect(profile['weaknesses'], isEmpty);
+    });
+  });
+
+  group('RuleBasedCoach — generateInitialChallenge rotation', () {
+    // generateInitialChallenge() rotates using DateTime.now() % n, so these
+    // tests never assert a specific pick — only that every pick, across many
+    // calls, lands in the exact set of valid templates and never throws.
+    const generic = <String>[
+      '¡Hola de nuevo! Cuéntame en voz alta cuál fue la parte más divertida de tu día.',
+      '¡Hola! Si pudieras tener un superpoder por un día, ¿cuál elegirías y por qué?',
+      '¡Hola! Cuéntame sobre tu juego o juguete favorito y por qué te gusta tanto.',
+      '¡Hola! Platícame sobre tu comida o postre preferido como si fueras un chef.',
+    ];
+
+    test(
+        'with no interests in the profile, always returns one of the 4 generic challenges',
+        () async {
+      for (var i = 0; i < 20; i++) {
+        final challenge =
+            await coach.generateInitialChallenge('{"strengths":["x"]}');
+        expect(challenge, isNotEmpty);
+        expect(generic, contains(challenge));
+      }
+    });
+
+    test('with an invalid JSON profile, falls back to a generic challenge',
+        () async {
+      for (var i = 0; i < 20; i++) {
+        final challenge = await coach.generateInitialChallenge('not json at all');
+        expect(challenge, isNotEmpty);
+        expect(generic, contains(challenge));
+      }
+    });
+
+    test(
+        'with interests in the profile, always returns a valid generic or '
+        'interest-personalized challenge, never throws', () async {
+      const interests = ['Fútbol', 'Dibujar'];
+      final personalized = <String>[
+        for (final interest in interests) ...[
+          '¡Hola! Me contaste que te gusta $interest. Cuéntame qué es lo que '
+              'más te gusta de eso.',
+          '¡Hola de nuevo! Ya que te gusta $interest, imagina que se lo '
+              'explicas a un amigo que no lo conoce.',
+        ],
+      ];
+      final validChallenges = {...generic, ...personalized};
+
+      for (var i = 0; i < 30; i++) {
+        final challenge = await coach
+            .generateInitialChallenge('{"interests":["Fútbol","Dibujar"]}');
+        expect(challenge, isNotEmpty);
+        expect(validChallenges, contains(challenge));
+      }
     });
   });
 

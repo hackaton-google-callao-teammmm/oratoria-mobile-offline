@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import '../analysis/scoring.dart';
 import '../entities/body_metrics.dart';
 import '../entities/coach_feedback.dart';
 import '../entities/exercise.dart';
 import '../entities/paraverbal_metrics.dart';
 import '../ports/ports.dart';
+import 'profile_updater.dart';
 
 /// Scored dimension, used to pick the best and worst of the run.
 class _Scored {
@@ -29,7 +32,14 @@ class _Scored {
 class RuleBasedCoach implements CoachFeedbackGenerator {
   final Scoring scoring;
 
-  const RuleBasedCoach({this.scoring = const Scoring()});
+  /// Fills in the AI profile deterministically — the only producer of real
+  /// profile content on a device where Gemma never loads.
+  final ProfileUpdater profileUpdater;
+
+  const RuleBasedCoach({
+    this.scoring = const Scoring(),
+    this.profileUpdater = const ProfileUpdater(),
+  });
 
   @override
   Future<CoachFeedback> generate({
@@ -87,8 +97,40 @@ class RuleBasedCoach implements CoachFeedbackGenerator {
       '¡Hola! Cuéntame sobre tu juego o juguete favorito y por qué te gusta tanto.',
       '¡Hola! Platícame sobre tu comida o postre preferido como si fueras un chef.',
     ];
+
+    // Once the profile knows an interest, mix in two challenges that name it
+    // instead of only ever asking generic questions.
+    final interests = _profileInterests(aiProfile);
+    if (interests.isNotEmpty) {
+      final interestIndex =
+          DateTime.now().millisecondsSinceEpoch % interests.length;
+      final interest = interests[interestIndex];
+      challenges.addAll([
+        '¡Hola! Me contaste que te gusta $interest. Cuéntame qué es lo que más te gusta de eso.',
+        '¡Hola de nuevo! Ya que te gusta $interest, imagina que se lo explicas a un amigo que no lo conoce.',
+      ]);
+    }
+
     final index = DateTime.now().millisecondsSinceEpoch % challenges.length;
     return challenges[index];
+  }
+
+  /// Defensive parse: any shape other than a JSON object with a non-empty
+  /// "interests" list yields an empty list rather than throwing.
+  List<String> _profileInterests(String aiProfile) {
+    try {
+      final decoded = jsonDecode(aiProfile);
+      if (decoded is Map<String, dynamic>) {
+        final interests = decoded['interests'];
+        if (interests is List) {
+          return interests
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+        }
+      }
+    } catch (_) {}
+    return const [];
   }
 
   @override
@@ -109,13 +151,21 @@ class RuleBasedCoach implements CoachFeedbackGenerator {
       pausesTrusted: pausesTrusted,
       transcript: transcript,
     );
-    // No real profiling without Gemma, but a null/empty profile must still
-    // flip to non-empty after the first practice — otherwise
+    // No Gemma required: ProfileUpdater turns the same honest signals the
+    // coach just judged into durable strengths/weaknesses/interests. It
+    // never throws and never returns an empty profile, so a null/empty
+    // profile still flips to non-empty after the first practice — otherwise
     // generateInitialChallenge() keeps taking the "first time" branch
-    // forever and the child never reaches the rotating generic challenges
-    // (see design.md's documented fallback behaviour).
-    final profile =
-        (aiProfile == null || aiProfile.trim().isEmpty) ? '{}' : aiProfile;
+    // forever and the child never reaches the rotating challenges (see
+    // design.md's documented fallback behaviour).
+    final profile = profileUpdater.update(
+      currentJson: aiProfile,
+      voice: voice,
+      body: body,
+      voiceTrusted: voiceTrusted,
+      pausesTrusted: pausesTrusted,
+      transcript: transcript,
+    );
     return (fb, profile);
   }
 

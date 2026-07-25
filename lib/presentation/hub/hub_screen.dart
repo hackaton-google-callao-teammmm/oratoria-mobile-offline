@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme/theme_controller.dart';
 import '../../data/local_store.dart';
-import '../../shared/avatars.dart';
 import '../../shared/brand/aurora_background.dart';
 import '../../shared/brand/eq_waveform.dart';
 import '../../shared/characters/vox.dart';

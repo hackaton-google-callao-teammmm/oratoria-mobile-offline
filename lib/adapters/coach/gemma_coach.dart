@@ -72,18 +72,114 @@ class GemmaCoach implements CoachFeedbackGenerator {
       transcript: transcript,
     );
 
-    if (transcript == null || transcript.trim().isEmpty) {
-      return (baseFeedback, aiProfile);
+    // Deterministic baseline first — straight to ProfileUpdater (not
+    // _base.generateWithProfile, which would repeat _base.generate() a
+    // second time just to discard its feedback). Gemma only ever enriches
+    // this; it is never the sole author of the profile, so a
+    // failed/timed-out/invalid/untrusted reply still leaves the child with
+    // the real, rule-derived profile instead of the untouched input.
+    final baseProfile = _base.profileUpdater.update(
+      currentJson: aiProfile,
+      voice: voice,
+      body: body,
+      voiceTrusted: voiceTrusted,
+      pausesTrusted: pausesTrusted,
+      transcript: transcript,
+    );
+
+    // Same honesty gate as the rest of the coach: an untrusted or too-short
+    // transcript must not be handed to Gemma to "extract" a profile from —
+    // that would be inventing signal from placeholder or noise text.
+    if (!voiceTrusted ||
+        !voice.isMeaningful ||
+        transcript == null ||
+        transcript.trim().isEmpty) {
+      return (baseFeedback, baseProfile);
     }
 
     try {
       final prompt = _profileUpdatePrompt(aiProfile, transcript);
       final rawJson = await _rewrite(prompt);
       final validJson = _cleanAndValidateJson(rawJson);
-      return (baseFeedback, validJson ?? aiProfile);
+      if (validJson == null) return (baseFeedback, baseProfile);
+      return (baseFeedback, _mergeProfiles(baseProfile, validJson));
     } catch (_) {
-      return (baseFeedback, aiProfile);
+      return (baseFeedback, baseProfile);
     }
+  }
+
+  /// Merges Gemma's (already-validated) profile JSON onto the deterministic
+  /// baseline: Gemma may override name/age when it actually said something,
+  /// and interests/strengths/weaknesses are unioned (baseline first,
+  /// case-insensitive dedupe) rather than replaced, so Gemma can only add to
+  /// what the rule-based signals already found.
+  String _mergeProfiles(String? baseJson, String geminiJson) {
+    final base = _decodeMap(baseJson);
+    final gemini = _decodeMap(geminiJson);
+    final merged = Map<String, dynamic>.from(base);
+
+    final geminiName = gemini['name'];
+    if (geminiName is String && geminiName.trim().isNotEmpty) {
+      merged['name'] = geminiName;
+    }
+    final geminiAge = gemini['age'];
+    if (geminiAge != null && geminiAge.toString().trim().isNotEmpty) {
+      merged['age'] = geminiAge;
+    }
+
+    merged['interests'] = _union(
+      _asStringList(base['interests']),
+      _asStringList(gemini['interests']),
+      cap: 6,
+    );
+    merged['strengths'] = _union(
+      _asStringList(base['strengths']),
+      _asStringList(gemini['strengths']),
+      cap: 6,
+    );
+    merged['weaknesses'] = _union(
+      _asStringList(base['weaknesses']),
+      _asStringList(gemini['weaknesses']),
+      cap: 6,
+    );
+
+    return jsonEncode(merged);
+  }
+
+  Map<String, dynamic> _decodeMap(String? json) {
+    if (json == null) return {};
+    try {
+      final decoded = jsonDecode(json);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {}
+    return {};
+  }
+
+  List<String> _asStringList(dynamic value) {
+    if (value is List) return value.map((e) => e.toString()).toList();
+    return <String>[];
+  }
+
+  /// Dedupe (base entries first, extra entries appended) using the same
+  /// diacritic-insensitive comparison ProfileUpdater dedupes with — a plain
+  /// `toLowerCase()` would let Gemma's untidy "futbol" survive alongside
+  /// ProfileUpdater's canonical "Fútbol" as two separate chips. [cap], when
+  /// given, truncates the result. Applied to interests, strengths and
+  /// weaknesses alike so a chatty Gemma can't make any of them grow without
+  /// bound across sessions.
+  List<String> _union(List<String> base, List<String> extra, {int? cap}) {
+    final result = List<String>.from(base);
+    for (final item in extra) {
+      if (item.trim().isEmpty) continue;
+      if (result.any((e) =>
+          ProfileUpdater.normalizeForComparison(e) ==
+          ProfileUpdater.normalizeForComparison(item))) {
+        continue;
+      }
+      result.add(item);
+    }
+    if (cap != null && result.length > cap) return result.sublist(0, cap);
+    return result;
   }
 
   String _initialChallengePrompt(String? aiProfile) {
