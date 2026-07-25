@@ -41,22 +41,16 @@ class ProgressScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-
                   if (showBack) ...[
                     IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(context).pop();
+                      },
                       icon: const Icon(Icons.arrow_back),
                     ),
                     const SizedBox(width: 4),
-                  
-                  IconButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.of(context).pop();
-                    },
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  const SizedBox(width: 4),
+                  ],
                   Text('Mi progreso', style: text.headlineMedium),
                 ],
               ),
