@@ -22,11 +22,17 @@ class ReportScreen extends StatelessWidget {
   /// sugerir" without touching anything else).
   final void Function(Exercise exercise)? onStartExercise;
 
+  /// The audience's follow-up question (the Agentes beat), written on-device by
+  /// Gemma. Shown as a card here instead of a blocking screen before the report,
+  /// so it's the "wow" without gating the payoff. Null → the card is omitted.
+  final String? audienceQuestion;
+
   const ReportScreen({
     super.key,
     required this.result,
     required this.onPracticeAgain,
     this.onStartExercise,
+    this.audienceQuestion,
   });
 
   @override
@@ -110,6 +116,14 @@ class ReportScreen extends StatelessWidget {
               if (result.voiceTextTrusted &&
                   result.transcript.trim().isNotEmpty) ...[
                 _HeardCard(transcript: result.transcript.trim()),
+                const SizedBox(height: 28),
+              ],
+              // The audience's follow-up — the Agentes "wow": an on-device AI
+              // that listened and wants to hear more, no internet. A card, not a
+              // gate, so it never blocks the payoff.
+              if (audienceQuestion != null &&
+                  audienceQuestion!.trim().isNotEmpty) ...[
+                _AudienceCard(question: audienceQuestion!.trim()),
                 const SizedBox(height: 28),
               ],
               // The next challenge, chosen from the weakest trusted dimension —
@@ -354,6 +368,69 @@ class _HeardCard extends StatelessWidget {
               height: 1.4,
               fontStyle: FontStyle.italic,
             ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Honest expectation-setting: the STT runs 100% on-device, and this
+        // small Whisper still slips on some Spanish words. Saying so keeps the
+        // transcript trustworthy — a judge sees we know its limits, not that we
+        // are hiding them.
+        Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 13, color: t.inkFaint),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Reconocido en el dispositivo, sin internet. Aún puede '
+                'equivocarse en algunas palabras.',
+                style: TextStyle(
+                  color: t.inkFaint,
+                  fontSize: 11.5,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// The audience's follow-up question — the Agentes beat, folded into the report
+/// as a quiet card instead of a blocking screen. On-device Gemma wrote it after
+/// "listening", so it reads as the room leaning in, not a form to dismiss.
+class _AudienceCard extends StatelessWidget {
+  final String question;
+
+  const _AudienceCard({required this.question});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.groups_rounded, size: 16, color: t.accent),
+            const SizedBox(width: 8),
+            const Eyebrow('Tu público pregunta'),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: t.accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: t.accent.withValues(alpha: 0.22)),
+          ),
+          child: Text(
+            '“$question”',
+            style: text.titleMedium?.copyWith(height: 1.35),
           ),
         ),
       ],

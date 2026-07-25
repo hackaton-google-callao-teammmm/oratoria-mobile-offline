@@ -52,7 +52,7 @@ class SessionScreen extends StatefulWidget {
   State<SessionScreen> createState() => _SessionScreenState();
 }
 
-enum _Phase { countdown, speaking, thinking, question }
+enum _Phase { countdown, speaking, thinking }
 
 class _SessionScreenState extends State<SessionScreen> {
   final _recorder = AudioRecorder();
@@ -289,11 +289,12 @@ class _SessionScreenState extends State<SessionScreen> {
         .forExercise(widget.exercise);
 
     if (!mounted) return;
-    setState(() {
-      _result = result;
-      _question = question;
-      _phase = _Phase.question;
-    });
+    _result = result;
+    _question = question;
+    // No blocking "audience asks" screen: it gated the payoff behind an extra
+    // tap. The audience's follow-up (the Agentes beat) now rides ON the report
+    // as a card, so the child lands straight on their results.
+    _goToReport();
   }
 
   void _goToReport() {
@@ -308,6 +309,7 @@ class _SessionScreenState extends State<SessionScreen> {
       MaterialPageRoute<void>(
         builder: (_) => ReportScreen(
           result: result,
+          audienceQuestion: _question?.text,
           onPracticeAgain: () => Navigator.of(context).pop(),
           onStartExercise: (exercise) => nav.pushReplacement(
             MaterialPageRoute<void>(
@@ -340,85 +342,8 @@ class _SessionScreenState extends State<SessionScreen> {
               caption: _caption,
             ),
           _Phase.thinking => _Thinking(tokens: t),
-          _Phase.question => _AudienceAsks(
-              question: _question!,
-              onContinue: _goToReport,
-            ),
         },
       ),
-    );
-  }
-}
-
-/// Step 7 — a member of La Banca asks a follow-up question, written on-device
-/// by Gemma (or the topic bank if Gemma was slow/unavailable). This is the
-/// wow: an AI that listened and wants to hear more, with no internet.
-/// The audience question beat — the wow. Shows Gemma's follow-up in the mouth
-/// of La Banca. There is intentionally NO "reply" action: replying isn't built
-/// yet, so a button promising it would be a dishonest micro-flow. The presenter
-/// answers the room out loud to show the loop; the app just poses the question.
-/// A single "Continuar" keeps the moment in the speaker's hands, with a
-/// generous auto-advance as a safety net so it never dead-ends.
-class _AudienceAsks extends StatefulWidget {
-  final AskedQuestion question;
-  final VoidCallback onContinue;
-
-  const _AudienceAsks({required this.question, required this.onContinue});
-
-  @override
-  State<_AudienceAsks> createState() => _AudienceAsksState();
-}
-
-class _AudienceAsksState extends State<_AudienceAsks> {
-  Timer? _autoAdvance;
-
-  @override
-  void initState() {
-    super.initState();
-    // Safety net only — generous so the presenter controls the pace.
-    _autoAdvance = Timer(const Duration(seconds: 9), _go);
-  }
-
-  @override
-  void dispose() {
-    _autoAdvance?.cancel();
-    super.dispose();
-  }
-
-  void _go() {
-    _autoAdvance?.cancel();
-    widget.onContinue();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return Column(
-      children: [
-        const SizedBox(height: 24),
-        // The excited audience — they're engaged and curious now.
-        const LaBanca(energy: 0.9, height: 150),
-        const SizedBox(height: 24),
-        Text('Tu público quiere saber más', style: text.titleMedium),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Text(
-            widget.question.text,
-            textAlign: TextAlign.center,
-            style: text.displaySmall?.copyWith(fontSize: 30),
-          ),
-        ),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: PillButton(
-            label: 'Continuar',
-            icon: Icons.arrow_forward_rounded,
-            onPressed: _go,
-          ),
-        ),
-      ],
     );
   }
 }
