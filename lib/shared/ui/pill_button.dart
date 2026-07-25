@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/theme/tokens.dart';
+import 'morphing_text.dart';
 
 /// The hero call-to-action — a gradient "pill" with a soft coloured glow and a
 /// tactile press-scale. Used for the big Practicar button; more expressive
 /// than a flat FilledButton, still calm enough for kids.
+///
+/// Pass [labels] (2+ entries) instead of a single [label] to have the text
+/// morph between them (see [MorphingText]) — used to keep "Practicar" feeling
+/// alive with rotating calls to action.
 class PillButton extends StatefulWidget {
   final String label;
+  final List<String>? labels;
   final IconData? icon;
   final VoidCallback onPressed;
   final double height;
@@ -16,6 +22,7 @@ class PillButton extends StatefulWidget {
     super.key,
     required this.label,
     required this.onPressed,
+    this.labels,
     this.icon,
     this.height = 68,
   });
@@ -65,24 +72,36 @@ class _PillButtonState extends State<PillButton> {
               ),
             ],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, color: t.onLime, size: 24),
-                const SizedBox(width: 10),
-              ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: t.onLime,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
+          child: (widget.labels != null && widget.labels!.length > 1)
+              ? MorphingText(
+                  texts: widget.labels!,
+                  icon: widget.icon,
+                  iconColor: t.onLime,
+                  style: TextStyle(
+                    color: t.onLime,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.icon != null) ...[
+                      Icon(widget.icon, color: t.onLime, size: 24),
+                      const SizedBox(width: 10),
+                    ],
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        color: t.onLime,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

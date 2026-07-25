@@ -137,6 +137,12 @@ class HubScreen extends StatelessWidget {
                 const Spacer(),
                 PillButton(
                   label: 'Practicar',
+                  labels: const [
+                    'Practicar',
+                    '¡Vamos!',
+                    'Tu turno',
+                    'A hablar',
+                  ],
                   icon: Icons.mic_rounded,
                   onPressed: () => _practice(context),
                 ),
