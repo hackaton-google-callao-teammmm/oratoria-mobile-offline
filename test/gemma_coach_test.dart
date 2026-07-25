@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oratoria_core/oratoria_core.dart';
 import 'package:oratoria_kids/adapters/coach/gemma_coach.dart';
@@ -215,5 +217,230 @@ void main() {
 
     expect(fb.strengthBody, isNotEmpty);
     expect(updated, contains('space'));
+  });
+
+  group('GemmaCoach — deterministic profile baseline (new contract)', () {
+    // The rule-based ProfileUpdater baseline is always computed first via
+    // RuleBasedCoach.generateWithProfile; Gemma may only enrich it. On any
+    // failure the caller must get that baseline back — never the untouched
+    // input aiProfile.
+    const existingProfile = '{"interests":["dinosaurios"]}';
+
+    test('rewrite returning null yields the deterministic baseline, not the input aiProfile',
+        () async {
+      final coach = GemmaCoach(rewrite: (_) async => null);
+
+      final (_, expectedBase) = await rule.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: 'Me gusta el fútbol.',
+      );
+      final (_, updated) = await coach.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      expect(updated, isNot(existingProfile));
+      expect(jsonDecode(updated!), jsonDecode(expectedBase!));
+    });
+
+    test('rewrite throwing yields the deterministic baseline, not the input aiProfile',
+        () async {
+      final coach =
+          GemmaCoach(rewrite: (_) async => throw StateError('model crashed'));
+
+      final (_, expectedBase) = await rule.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: 'Me gusta el fútbol.',
+      );
+      final (_, updated) = await coach.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      expect(updated, isNot(existingProfile));
+      expect(jsonDecode(updated!), jsonDecode(expectedBase!));
+    });
+
+    test('a valid Gemma JSON reply merges its interests onto the baseline, keeping both',
+        () async {
+      final coach = GemmaCoach(rewrite: (prompt) async {
+        if (prompt.contains('FORTALEZA')) {
+          return 'FORTALEZA: x\nMEJORA: y';
+        }
+        return '{"interests":["Espacio"]}';
+      });
+
+      final (_, updated) = await coach.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: 'Hoy quiero hablar de otra cosa.',
+      );
+
+      final interests =
+          (jsonDecode(updated!) as Map<String, dynamic>)['interests'] as List;
+      // Base interest carried over from the deterministic profile...
+      expect(interests, contains('dinosaurios'));
+      // ...and Gemma's own addition is folded in, not swallowed.
+      expect(interests, contains('Espacio'));
+    });
+
+    test('an empty transcript short-circuits to the baseline without invoking the profile rewrite',
+        () async {
+      var profileRewriteCalled = false;
+      final coach = GemmaCoach(rewrite: (prompt) async {
+        if (prompt.contains('FORTALEZA')) {
+          return 'FORTALEZA: x\nMEJORA: y';
+        }
+        profileRewriteCalled = true;
+        return '{"interests":["Espacio"]}';
+      });
+
+      final (_, expectedBase) = await rule.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+      );
+      final (_, updated) = await coach.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: '',
+      );
+
+      expect(jsonDecode(updated!), jsonDecode(expectedBase!));
+      expect(profileRewriteCalled, isFalse);
+    });
+  });
+
+  group('GemmaCoach — profile trust gates and merge cap (regression)', () {
+    const existingProfile = '{"interests":["dinosaurios"]}';
+
+    test(
+        'voiceTrusted=false with a non-empty transcript never invokes the '
+        'rewrite at all, and returns the deterministic baseline', () async {
+      var rewriteCallCount = 0;
+      final coach = GemmaCoach(rewrite: (prompt) async {
+        rewriteCallCount++;
+        return '{"interests":["Espacio"]}';
+      });
+
+      final expectedBase = rule.profileUpdater.update(
+        currentJson: existingProfile,
+        voice: _voice(),
+        body: BodyMetrics.none,
+        voiceTrusted: false,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      final (_, updated) = await coach.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        voiceTrusted: false,
+        aiProfile: existingProfile,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      expect(rewriteCallCount, 0);
+      expect(jsonDecode(updated!), jsonDecode(expectedBase));
+    });
+
+    test(
+        'a run too short to be meaningful never invokes the rewrite either, '
+        'and returns the deterministic baseline', () async {
+      var rewriteCallCount = 0;
+      final coach = GemmaCoach(rewrite: (prompt) async {
+        rewriteCallCount++;
+        return '{"interests":["Espacio"]}';
+      });
+
+      final tooShort =
+          _voice(wordCount: 2, duration: const Duration(seconds: 2));
+      final expectedBase = rule.profileUpdater.update(
+        currentJson: existingProfile,
+        voice: tooShort,
+        body: BodyMetrics.none,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      final (_, updated) = await coach.generateWithProfile(
+        voice: tooShort,
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existingProfile,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      expect(rewriteCallCount, 0);
+      expect(jsonDecode(updated!), jsonDecode(expectedBase));
+    });
+
+    test(
+        'merging strengths caps the union at 6, keeping the deterministic '
+        'base entries first', () async {
+      // Neutral voice metrics so ProfileUpdater's own canonical strengths
+      // never enter the mix — only the 4 pre-existing, non-canonical
+      // strengths from aiProfile make up the base.
+      final neutralVoice = _voice(wpm: 165, fillerRate: 3.5, awkwardPauses: 3);
+      const profileWithFour = '{"strengths":["S1","S2","S3","S4"]}';
+
+      final coach = GemmaCoach(rewrite: (prompt) async {
+        if (prompt.contains('FORTALEZA')) return null;
+        return '{"strengths":["G1","G2","G3","G4","G5"]}';
+      });
+
+      final (_, updated) = await coach.generateWithProfile(
+        voice: neutralVoice,
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: profileWithFour,
+        transcript: 'Cuento algo sin relación con mis fortalezas.',
+      );
+
+      final strengths =
+          (jsonDecode(updated!) as Map<String, dynamic>)['strengths'] as List;
+      expect(strengths.length, 6);
+      expect(strengths, ['S1', 'S2', 'S3', 'S4', 'G1', 'G2']);
+    });
+
+    test(
+        'merging interests dedupes accents: base "Fútbol" + Gemma "futbol" '
+        'collapse to a single entry (the base one)', () async {
+      // Regression: _union used to dedupe with a plain toLowerCase(), which
+      // let Gemma's untidy unaccented "futbol" survive next to
+      // ProfileUpdater's canonical "Fútbol" as two separate chips.
+      final coach = GemmaCoach(rewrite: (prompt) async {
+        if (prompt.contains('FORTALEZA')) return null;
+        return '{"interests":["futbol"]}';
+      });
+
+      final (_, updated) = await coach.generateWithProfile(
+        voice: _voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        transcript: 'Me gusta el fútbol.',
+      );
+
+      final profile = jsonDecode(updated!) as Map<String, dynamic>;
+      // The deterministic base must have actually produced "Fútbol" for this
+      // to be a meaningful regression check.
+      expect(profile['interests'], ['Fútbol']);
+    });
   });
 }

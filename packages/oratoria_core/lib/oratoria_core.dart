@@ -10,6 +10,7 @@ library;
 export 'src/analysis/paraverbal_analyzer.dart';
 export 'src/analysis/scoring.dart';
 export 'src/analysis/spanish_fillers.dart';
+export 'src/coach/profile_updater.dart';
 export 'src/coach/rule_based_coach.dart';
 export 'src/entities/body_metrics.dart';
 export 'src/entities/coach_feedback.dart';
