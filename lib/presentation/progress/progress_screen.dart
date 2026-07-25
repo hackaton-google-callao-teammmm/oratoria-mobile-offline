@@ -5,8 +5,10 @@ import 'package:oratoria_core/oratoria_core.dart';
 import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
 import '../../data/progress_impact.dart';
+import '../../shared/animations/circular_reveal_page_route.dart';
 import '../../shared/brand/aurora_background.dart';
 import '../../shared/ui/eyebrow.dart';
+import 'session_detail_screen.dart';
 
 /// Mi progreso (Flujo 3) — stars earned per practice, read from the local
 /// store. No raw scores, no leaderboard: the focus is "I improved vs myself",
@@ -195,6 +197,20 @@ class _ResultRow extends StatefulWidget {
 
 class _ResultRowState extends State<_ResultRow> {
   bool _isPressed = false;
+  Offset? _tapPosition;
+
+  void _navigateToDetail(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    setState(() => _isPressed = false);
+    final size = MediaQuery.of(context).size;
+    final center = _tapPosition ?? Offset(size.width / 2, size.height / 2);
+    Navigator.of(context).push(
+      CircularRevealPageRoute(
+        center: center,
+        page: SessionDetailScreen(result: widget.result),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,12 +219,17 @@ class _ResultRowState extends State<_ResultRow> {
     final exercise = ExerciseCatalog.byId(widget.result.exerciseId);
 
     return GestureDetector(
-      onTapDown: (_) {
+      onTapDown: (details) {
         HapticFeedback.selectionClick();
-        setState(() => _isPressed = true);
+        setState(() {
+          _isPressed = true;
+          _tapPosition = details.globalPosition;
+        });
       },
       onTapUp: (_) => setState(() => _isPressed = false),
       onTapCancel: () => setState(() => _isPressed = false),
+      onTap: () => _navigateToDetail(context),
+      onLongPress: () => _navigateToDetail(context),
       child: AnimatedScale(
         scale: _isPressed ? 0.98 : 1.0,
         duration: const Duration(milliseconds: 100),

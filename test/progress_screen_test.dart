@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oratoria_kids/data/local_store.dart';
 import 'package:oratoria_kids/presentation/progress/progress_screen.dart';
+import 'package:oratoria_kids/presentation/progress/session_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -110,5 +111,82 @@ void main() {
     // extra for it.
     expect(find.textContaining('de 95 a 118'), findsOneWidget);
     expect(find.textContaining('de 6 a 3'), findsOneWidget);
+  });
+
+  testWidgets(
+      'long press en una tarjeta de práctica abre SessionDetailScreen',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore(await SharedPreferences.getInstance());
+    const profile = Profile(id: 'p1', name: 'Ana', avatarKey: 'fox');
+
+    await store.saveResult(
+      profile.id,
+      SavedResult(
+        exerciseId: 'articulacion',
+        score: 92,
+        stars: 5,
+        atMillis: DateTime.now().millisecondsSinceEpoch,
+        wordsPerMinute: 135,
+        fillerRate: 0.02,
+      ),
+    );
+
+    tester.view.physicalSize = const Size(1200, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: ProgressScreen(profile: profile, store: store)),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    // Tap or long press on the row
+    await tester.longPress(find.text('Hoy'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    // Verify detail screen components
+    expect(find.text('92'), findsOneWidget);
+    expect(find.text('MÉTRICAS DE VOZ'), findsOneWidget);
+    expect(find.text('MODULACIÓN Y ENTONACIÓN'), findsOneWidget);
+    expect(find.text('RETROALIMENTACIÓN CUALITATIVA'), findsOneWidget);
+
+    // Verify back navigation returns to progress screen
+    await tester.tap(find.byTooltip('Volver a progreso'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('Mi progreso'), findsOneWidget);
+  });
+
+  testWidgets(
+      'SessionDetailScreen no genera overflow en pantallas estrechas (320px)',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const result = SavedResult(
+      exerciseId: 'articulacion',
+      score: 88,
+      stars: 4,
+      atMillis: 1700000000000,
+      wordsPerMinute: 130,
+      fillerRate: 0.03,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SessionDetailScreen(result: result),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Variación de frecuencia (Pitch)'), findsOneWidget);
+    expect(find.text('Dinámica vocal'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
