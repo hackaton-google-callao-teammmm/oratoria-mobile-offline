@@ -13,7 +13,15 @@ class ProgressScreen extends StatelessWidget {
   final Profile profile;
   final LocalStore store;
 
-  const ProgressScreen({super.key, required this.profile, required this.store});
+  /// Hidden when embedded as a tab in [MainShell]; shown when pushed standalone.
+  final bool showBack;
+
+  const ProgressScreen({
+    super.key,
+    required this.profile,
+    required this.store,
+    this.showBack = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +39,13 @@ class ProgressScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  const SizedBox(width: 4),
+                  if (showBack) ...[
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text('Mi progreso', style: text.headlineMedium),
                 ],
               ),

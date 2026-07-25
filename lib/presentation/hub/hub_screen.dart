@@ -21,14 +21,23 @@ class HubScreen extends StatelessWidget {
   final LocalStore store;
   final ThemeController themeController;
 
+  /// When hosted in [MainShell], these switch tabs instead of pushing a new
+  /// route. Left null when the hub is shown standalone, in which case it keeps
+  /// its original push navigation (backward compatible).
+  final VoidCallback? onPractice;
+  final VoidCallback? onProgress;
+
   const HubScreen({
     super.key,
     required this.profile,
     required this.store,
     required this.themeController,
+    this.onPractice,
+    this.onProgress,
   });
 
   void _practice(BuildContext context) {
+    if (onPractice != null) return onPractice!();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => HomeScreen(profile: profile, store: store),
@@ -37,6 +46,7 @@ class HubScreen extends StatelessWidget {
   }
 
   void _progress(BuildContext context) {
+    if (onProgress != null) return onProgress!();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ProgressScreen(profile: profile, store: store),

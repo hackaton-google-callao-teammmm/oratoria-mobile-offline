@@ -15,7 +15,16 @@ class HomeScreen extends StatelessWidget {
   final Profile profile;
   final LocalStore store;
 
-  const HomeScreen({super.key, required this.profile, required this.store});
+  /// Hidden when embedded as a tab in [MainShell] (there's nothing to pop back
+  /// to); shown when pushed as its own route.
+  final bool showBack;
+
+  const HomeScreen({
+    super.key,
+    required this.profile,
+    required this.store,
+    this.showBack = true,
+  });
 
   void _runPractice(BuildContext context, Exercise exercise) {
     Navigator.of(context).push(
@@ -39,11 +48,13 @@ class HomeScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  const SizedBox(width: 4),
+                  if (showBack) ...[
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text(
                     'Elige un reto',
                     style: Theme.of(context).textTheme.headlineMedium,
