@@ -5,7 +5,7 @@ import '../../app/theme/theme_controller.dart';
 import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
 import '../../shared/avatars.dart';
-import '../hub/hub_screen.dart';
+import '../shell/main_shell.dart';
 import 'profile_create_screen.dart';
 
 /// Elegir perfil (Flujo 1) — the beautiful auth-style entry, but LOCAL: no
@@ -31,7 +31,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   void _open(Profile profile) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => HubScreen(
+        builder: (_) => MainShell(
           profile: profile,
           store: widget.store,
           themeController: widget.themeController,

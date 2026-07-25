@@ -81,4 +81,48 @@ void main() {
     expect(analysis.trusted, isTrue);
     expect(analysis.pauses, isEmpty);
   });
+
+  group('trimSilenceEdges (Whisper input only)', () {
+    test('trims leading and trailing silence, keeps the speech', () {
+      final full = _pcm([
+        (0.0, 2000), // lead-in silence Whisper would hallucinate over
+        (0.3, 3000), // real speech
+        (0.0, 2000), // trailing silence
+      ]);
+      final trimmed = detector.trimSilenceEdges(full);
+
+      expect(trimmed.length, lessThan(full.length));
+      expect(trimmed, isNotEmpty);
+      // ~3 s of speech + ~2×150 ms padding, well under the 7 s original.
+      final ms = trimmed.lengthInBytes * 1000 ~/ (_sampleRate * 2);
+      expect(ms, closeTo(3300, 250));
+    });
+
+    test('returns the ORIGINAL buffer for a near-silent clip', () {
+      final silent = _pcm([(0.0, 4000)]);
+      final out = detector.trimSilenceEdges(silent);
+      // Anti-empty guard: identical instance, never a zero-length buffer.
+      expect(identical(out, silent), isTrue);
+    });
+
+    test('returns the ORIGINAL when detected speech is below the minimum', () {
+      // A 200 ms blip (< 500 ms minSpeechMs) ringed by silence must not be
+      // trimmed down to almost nothing.
+      final blip = _pcm([(0.0, 2000), (0.3, 200), (0.0, 2000)]);
+      final out = detector.trimSilenceEdges(blip);
+      expect(identical(out, blip), isTrue);
+    });
+
+    test('leaves a clip too short to analyse untouched', () {
+      final tiny = _pcm([(0.3, 40)]); // < 3 frames
+      final out = detector.trimSilenceEdges(tiny);
+      expect(identical(out, tiny), isTrue);
+    });
+
+    test('trimmed PCM stays 16-bit aligned (even byte length)', () {
+      final full = _pcm([(0.0, 1500), (0.3, 3000), (0.0, 1500)]);
+      final trimmed = detector.trimSilenceEdges(full);
+      expect(trimmed.lengthInBytes.isEven, isTrue);
+    });
+  });
 }

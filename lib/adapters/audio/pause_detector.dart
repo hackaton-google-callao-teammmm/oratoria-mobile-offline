@@ -122,4 +122,71 @@ class PauseDetector {
 
     return PauseAnalysis(pauses, trusted: true);
   }
+
+  /// Returns [pcm] with only its LEADING and TRAILING silence trimmed (keeping
+  /// [paddingMs] of headroom so word onsets/offsets aren't clipped), so Whisper
+  /// is never fed the empty edges it hallucinates speech over. Internal audio is
+  /// left intact — inner pauses are real signal and are measured separately on
+  /// the original buffer.
+  ///
+  /// Anti-empty guard: returns the ORIGINAL buffer unchanged when there is too
+  /// little detected speech ([minSpeechMs]) — a near-silent clip must never
+  /// become a zero/sub-minimum buffer (Whisper on empty audio crashes or
+  /// hallucinates outright). This only touches the *transcription* input; the
+  /// pause VAD and the WPM denominator still use the original.
+  Uint8List trimSilenceEdges(
+    Uint8List pcm, {
+    int paddingMs = 150,
+    int minSpeechMs = 500,
+  }) {
+    final frameSamples = sampleRate * frameMs ~/ 1000;
+    if (frameSamples == 0 || pcm.lengthInBytes < frameSamples * 2 * 3) {
+      return pcm; // too short to analyse — leave it alone
+    }
+
+    // Per-frame RMS, one pass (same as detect()).
+    final frames = <double>[];
+    var peak = 0.0;
+    var sumSq = 0.0;
+    var count = 0;
+    for (var i = 0; i + 1 < pcm.lengthInBytes; i += 2) {
+      var v = (pcm[i + 1] << 8) | pcm[i];
+      if (v >= 0x8000) v -= 0x10000;
+      final f = v / 32768.0;
+      sumSq += f * f;
+      if (++count == frameSamples) {
+        final rms = math.sqrt(sumSq / frameSamples);
+        frames.add(rms);
+        if (rms > peak) peak = rms;
+        sumSq = 0.0;
+        count = 0;
+      }
+    }
+    if (peak < absoluteFloor) return pcm; // no real speech → don't trim to empty
+
+    final threshold = math.max(absoluteFloor, peak * silenceFactor);
+    var firstSpeech = -1;
+    var lastSpeech = -1;
+    for (var i = 0; i < frames.length; i++) {
+      if (frames[i] >= threshold) {
+        if (firstSpeech < 0) firstSpeech = i;
+        lastSpeech = i;
+      }
+    }
+    if (firstSpeech < 0) return pcm; // no speech at all → original
+
+    // Anti-empty guard: too little speech to trim safely.
+    if ((lastSpeech - firstSpeech + 1) * frameMs < minSpeechMs) return pcm;
+
+    final padFrames = (paddingMs / frameMs).ceil();
+    final startFrame = math.max(0, firstSpeech - padFrames);
+    final endFrame = math.min(frames.length - 1, lastSpeech + padFrames);
+    final startByte = startFrame * frameSamples * 2; // even (PCM16)
+    final endByte =
+        math.min(pcm.lengthInBytes, (endFrame + 1) * frameSamples * 2);
+    if (startByte >= endByte) return pcm;
+    // sublist() copies into a fresh buffer at offset 0, so a later
+    // `.buffer.asInt16List(0, ...)` reads the right bytes.
+    return pcm.sublist(startByte, endByte);
+  }
 }

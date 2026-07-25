@@ -60,6 +60,7 @@ Future<void> _pump(
   WidgetTester tester,
   PracticeResult r, {
   void Function(Exercise)? onStart,
+  String? audienceQuestion,
 }) async {
   // Tall surface so the whole report (a lazy ListView) is laid out — otherwise
   // sections near the bottom (e.g. "Lo que escuché") are never built and can't
@@ -75,6 +76,7 @@ Future<void> _pump(
         result: r,
         onPracticeAgain: () {},
         onStartExercise: onStart,
+        audienceQuestion: audienceQuestion,
       ),
     ),
   );
@@ -162,6 +164,32 @@ void main() {
 
     expect(find.textContaining('LO QUE ESCUCHÉ'), findsNothing);
     expect(find.textContaining('texto de muestra'), findsNothing);
+  });
+
+  // --- Audience follow-up (the Agentes beat) rides ON the report as a card,
+  // not a blocking screen before it. ---
+
+  testWidgets('shows the audience follow-up as a card when one was asked',
+      (tester) async {
+    await _pump(
+      tester,
+      _result(voiceTextTrusted: true, pausesTrusted: true),
+      audienceQuestion: '¿Y qué fue lo más difícil de todo eso?',
+    );
+
+    // Eyebrow renders uppercase; the question keeps its case.
+    expect(find.textContaining('TU PÚBLICO PREGUNTA'), findsOneWidget);
+    expect(
+      find.textContaining('¿Y qué fue lo más difícil de todo eso?'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('omits the audience card when no question was asked',
+      (tester) async {
+    await _pump(tester, _result(voiceTextTrusted: true, pausesTrusted: true));
+
+    expect(find.textContaining('TU PÚBLICO PREGUNTA'), findsNothing);
   });
 
   // --- Next-challenge card. The card lives on the same screen the _Rise bug
