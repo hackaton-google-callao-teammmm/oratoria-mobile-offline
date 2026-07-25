@@ -166,13 +166,6 @@ void main() {
     expect(find.textContaining('texto de muestra'), findsNothing);
   });
 
-  testWidgets('the transcript carries the honest "may err" on-device note',
-      (tester) async {
-    await _pump(tester, _result(voiceTextTrusted: true, pausesTrusted: true));
-
-    expect(find.textContaining('equivocarse en algunas palabras'), findsOneWidget);
-  });
-
   // --- Audience follow-up (the Agentes beat) rides ON the report as a card,
   // not a blocking screen before it. ---
 

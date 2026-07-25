@@ -370,28 +370,6 @@ class _HeardCard extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        // Honest expectation-setting: the STT runs 100% on-device, and this
-        // small Whisper still slips on some Spanish words. Saying so keeps the
-        // transcript trustworthy — a judge sees we know its limits, not that we
-        // are hiding them.
-        Row(
-          children: [
-            Icon(Icons.info_outline_rounded, size: 13, color: t.inkFaint),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                'Reconocido en el dispositivo, sin internet. Aún puede '
-                'equivocarse en algunas palabras.',
-                style: TextStyle(
-                  color: t.inkFaint,
-                  fontSize: 11.5,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
