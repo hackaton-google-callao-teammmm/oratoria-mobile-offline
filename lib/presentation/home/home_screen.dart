@@ -15,8 +15,8 @@ class HomeScreen extends StatelessWidget {
   final Profile profile;
   final LocalStore store;
 
-  /// Hidden when embedded as a tab in [MainShell] (there's nothing to pop back
-  /// to); shown when pushed as its own route.
+  /// Hidden when embedded with no route to pop back to; shown (the default)
+  /// when pushed as its own route.
   final bool showBack;
 
   const HomeScreen({
