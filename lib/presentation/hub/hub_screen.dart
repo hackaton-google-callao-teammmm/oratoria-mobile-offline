@@ -22,9 +22,8 @@ class HubScreen extends StatelessWidget {
   final LocalStore store;
   final ThemeController themeController;
 
-  /// When hosted in [MainShell], these switch tabs instead of pushing a new
-  /// route. Left null when the hub is shown standalone, in which case it keeps
-  /// its original push navigation (backward compatible).
+  /// Optional navigation overrides. When null (the default) the hub pushes new
+  /// routes for practice / progress; a host may pass these to intercept instead.
   final VoidCallback? onPractice;
   final VoidCallback? onProgress;
 

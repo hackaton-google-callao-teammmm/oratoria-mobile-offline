@@ -14,7 +14,8 @@ class ProgressScreen extends StatelessWidget {
   final Profile profile;
   final LocalStore store;
 
-  /// Hidden when embedded as a tab in [MainShell]; shown when pushed standalone.
+  /// Hidden when embedded with no route to pop back to; shown when pushed
+  /// standalone (the default).
   final bool showBack;
 
   const ProgressScreen({
