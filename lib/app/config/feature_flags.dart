@@ -20,7 +20,23 @@ abstract final class FeatureFlags {
   /// model only rephrases the two prose bodies. Any failure/timeout falls back
   /// to the exact rule-based text.
   ///
-  /// OFF by default: it adds a second Gemma call to the "Vox piensa" beat, so
-  /// its latency and RAM cost on the A12 must be measured before it ships.
-  static const bool gemmaFeedback = false;
+  /// ON: Gemma is confirmed working on the target device. Adds a second Gemma
+  /// call to the "Vox piensa" beat (feedback rewrite) plus the initial-
+  /// challenge and profile-update calls in `session_screen.dart` — all three
+  /// still fall back to the exact rule-based text/behaviour on any
+  /// failure/timeout, so this never costs the child their feedback.
+  static const bool gemmaFeedback = true;
+
+  /// Rewrites the title/prompt/hint of the ONE exercise
+  /// `suggestNextChallenge()` recommends on the report, using the child's AI
+  /// profile — so "Tu próximo reto" (and later "Elige un reto") can reflect
+  /// what the child actually likes talking about. The rewrite is triggered
+  /// from `ReportScreen` in the background (never blocking the report or the
+  /// "Continuar" button) and only ever affects cosmetic text — `id`,
+  /// `targetSkill` and `targetDuration` never change.
+  ///
+  /// OFF by default: separate from [gemmaFeedback] so its own latency/RAM
+  /// cost (one more call to the same singleton Gemma model) can be measured
+  /// and toggled independently before it ships.
+  static const bool personalizedExercises = false;
 }

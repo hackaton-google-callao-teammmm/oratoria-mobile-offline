@@ -261,6 +261,45 @@ void main() {
     });
   });
 
+  group('RuleBasedCoach — profile fallback (no Gemma)', () {
+    test('flips a null aiProfile to non-empty after one practice', () async {
+      // Without this, generateInitialChallenge() would keep taking the
+      // "first time" branch forever — the child never reaches the rotating
+      // generic challenges the fallback design promises.
+      final (_, updated) = await coach.generateWithProfile(
+        voice: voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+      );
+
+      expect(updated, isNotNull);
+      expect(updated!.trim(), isNotEmpty);
+    });
+
+    test('flips an empty-string aiProfile to non-empty too', () async {
+      final (_, updated) = await coach.generateWithProfile(
+        voice: voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: '   ',
+      );
+
+      expect(updated!.trim(), isNotEmpty);
+    });
+
+    test('leaves an already-populated aiProfile untouched', () async {
+      const existing = '{"interests":["dinosaurios"]}';
+      final (_, updated) = await coach.generateWithProfile(
+        voice: voice(),
+        body: BodyMetrics.none,
+        exercise: Exercise.free,
+        aiProfile: existing,
+      );
+
+      expect(updated, existing);
+    });
+  });
+
   group('End-to-end through the analyzer', () {
     test('a real Spanish transcript produces coherent feedback', () async {
       const transcript =

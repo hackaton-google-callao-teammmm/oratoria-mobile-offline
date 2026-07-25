@@ -46,6 +46,7 @@ class EvaluatePractice {
     bool transcriptTrusted = true,
     bool pausesTrusted = true,
     Duration? transcriptionWindow,
+    String? aiProfile,
   }) async {
     final voice = analyzer.analyze(
       transcript: transcript,
@@ -65,12 +66,14 @@ class EvaluatePractice {
     // The selected coach may be an on-device model that runs out of memory or
     // a LAN host that vanished mid-session. Neither is allowed to cost the
     // child their feedback, so we always have the templates behind us.
-    final feedback = await _generateFeedback(
+    final (feedback, updatedProfile) = await _generateFeedback(
       voice,
       body,
       exercise,
       transcriptTrusted,
       pausesTrusted,
+      aiProfile,
+      transcript,
     );
 
     return PracticeResult(
@@ -84,32 +87,38 @@ class EvaluatePractice {
       voiceTextTrusted: transcriptTrusted,
       pausesTrusted: pausesTrusted,
       transcript: transcript,
+      updatedAiProfile: updatedProfile,
     );
   }
 
-  Future<CoachFeedback> _generateFeedback(
+  Future<(CoachFeedback, String?)> _generateFeedback(
     ParaverbalMetrics voice,
     BodyMetrics body,
     Exercise exercise,
     bool voiceTrusted,
     bool pausesTrusted,
+    String? aiProfile,
+    String transcript,
   ) async {
     try {
-      return await coach.generate(
+      return await coach.generateWithProfile(
         voice: voice,
         body: body,
         exercise: exercise,
         voiceTrusted: voiceTrusted,
         pausesTrusted: pausesTrusted,
+        aiProfile: aiProfile,
+        transcript: transcript,
       );
     } catch (_) {
-      return fallbackCoach.generate(
+      final fb = await fallbackCoach.generate(
         voice: voice,
         body: body,
         exercise: exercise,
         voiceTrusted: voiceTrusted,
         pausesTrusted: pausesTrusted,
       );
+      return (fb, aiProfile);
     }
   }
 }

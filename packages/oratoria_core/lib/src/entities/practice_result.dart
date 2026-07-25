@@ -38,6 +38,9 @@ class PracticeResult {
   /// audio and its transcript are discarded after the run).
   final String transcript;
 
+  /// Transient updated AI profile JSON produced during evaluation.
+  final String? updatedAiProfile;
+
   const PracticeResult({
     required this.exercise,
     required this.voice,
@@ -49,6 +52,7 @@ class PracticeResult {
     this.voiceTextTrusted = true,
     this.pausesTrusted = true,
     this.transcript = '',
+    this.updatedAiProfile,
   });
 
   /// Where the prose came from — convenience for the UI badge.

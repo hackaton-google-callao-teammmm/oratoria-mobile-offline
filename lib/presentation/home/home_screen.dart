@@ -38,8 +38,32 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  /// Overlays a cached personalized title/prompt/hint onto [exercise] by id
+  /// — never onto "Práctica libre", which is never rewritten. `id`,
+  /// `targetSkill` and `targetDuration` always stay the original's.
+  Exercise _personalize(
+    Exercise exercise,
+    Map<String, PersonalizedExercise> overrides,
+  ) {
+    if (exercise.id == 'e-libre') return exercise;
+    final override = overrides[exercise.id];
+    if (override == null) return exercise;
+    return Exercise(
+      id: exercise.id,
+      title: override.title,
+      prompt: override.prompt,
+      targetDuration: exercise.targetDuration,
+      targetSkill: exercise.targetSkill,
+      targetHint: override.hint,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final overrides = store.getAllPersonalizedExercises(profile.id);
+    final exercises = [
+      for (final e in ExerciseCatalog.all) _personalize(e, overrides),
+    ];
     return Scaffold(
       body: AuroraBackground(
         child: SafeArea(
@@ -67,11 +91,11 @@ class HomeScreen extends StatelessWidget {
                 child: Eyebrow('Tus retos · 5'),
               ),
               const SizedBox(height: 16),
-              for (var i = 0; i < ExerciseCatalog.all.length; i++) ...[
+              for (var i = 0; i < exercises.length; i++) ...[
                 _ExerciseCard(
-                  exercise: ExerciseCatalog.all[i],
+                  exercise: exercises[i],
                   index: i + 1,
-                  onTap: () => _runPractice(context, ExerciseCatalog.all[i]),
+                  onTap: () => _runPractice(context, exercises[i]),
                 ),
                 const SizedBox(height: 14),
               ],

@@ -77,4 +77,27 @@ abstract class CoachFeedbackGenerator {
     bool voiceTrusted = true,
     bool pausesTrusted = true,
   });
+
+  /// Generates a dynamic initial challenge message based on the user's AI profile.
+  Future<String> generateInitialChallenge(String? aiProfile);
+
+  /// Generates coach feedback and optionally extracts an updated AI profile JSON.
+  Future<(CoachFeedback feedback, String? updatedAiProfile)> generateWithProfile({
+    required ParaverbalMetrics voice,
+    required BodyMetrics body,
+    required Exercise exercise,
+    bool voiceTrusted = true,
+    bool pausesTrusted = true,
+    String? aiProfile,
+    String? transcript,
+  }) async {
+    final feedback = await generate(
+      voice: voice,
+      body: body,
+      exercise: exercise,
+      voiceTrusted: voiceTrusted,
+      pausesTrusted: pausesTrusted,
+    );
+    return (feedback, aiProfile);
+  }
 }

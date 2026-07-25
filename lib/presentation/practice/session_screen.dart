@@ -83,9 +83,15 @@ class _SessionScreenState extends State<SessionScreen> {
   String _caption = '';
   StreamSubscription<String>? _captionSub;
 
+  String? _aiProfile;
+  String? _dynamicChallengePrompt;
+  bool _isLoadingChallenge = true;
+
   @override
   void initState() {
     super.initState();
+    _aiProfile = widget.store.getAiProfile(widget.profile.id);
+
     // Start the camera during the countdown so its one-time face-model load
     // (~1-2 s of frame skips) happens behind the 3·2·1, not when the child
     // starts speaking. Best-effort — audio-only if it fails.
@@ -98,6 +104,19 @@ class _SessionScreenState extends State<SessionScreen> {
           _bodyOn = true;
         });
       }
+    });
+    _loadInitialChallenge();
+  }
+
+  Future<void> _loadInitialChallenge() async {
+    final coach = FeatureFlags.gemmaFeedback
+        ? GemmaCoach.gemma()
+        : const RuleBasedCoach();
+    final prompt = await coach.generateInitialChallenge(_aiProfile);
+    if (!mounted) return;
+    setState(() {
+      _dynamicChallengePrompt = prompt;
+      _isLoadingChallenge = false;
     });
     _runCountdown();
   }
@@ -272,7 +291,15 @@ class _SessionScreenState extends State<SessionScreen> {
       // whose word metrics are hidden anyway.
       transcriptionWindow:
           transcript.trusted ? SherpaTranscriber.maxAudioWindow : null,
+      aiProfile: _aiProfile,
     );
+
+    if (result.updatedAiProfile != null) {
+      await widget.store.saveAiProfile(
+        widget.profile.id,
+        result.updatedAiProfile!,
+      );
+    }
 
     // Persist the result for "Mi progreso" (fire-and-forget; never blocks the
     // beat). Timestamp comes from timestamp() since Date.now is unavailable.
@@ -311,6 +338,8 @@ class _SessionScreenState extends State<SessionScreen> {
         builder: (_) => ReportScreen(
           result: result,
           audienceQuestion: _question?.text,
+          profile: widget.profile,
+          store: widget.store,
           onPracticeAgain: () => Navigator.of(context).pop(),
           onStartExercise: (exercise) => nav.pushReplacement(
             MaterialPageRoute<void>(
@@ -336,7 +365,13 @@ class _SessionScreenState extends State<SessionScreen> {
     return Scaffold(
       body: SafeArea(
         child: switch (_phase) {
-          _Phase.countdown => _Countdown(count: _count, exercise: widget.exercise),
+          _Phase.countdown => _isLoadingChallenge
+              ? _LoadingChallenge(tokens: t)
+              : _Countdown(
+                  count: _count,
+                  exercise: widget.exercise,
+                  promptText: _dynamicChallengePrompt ?? widget.exercise.prompt,
+                ),
           _Phase.speaking => _Speaking(
               energy: _energy,
               elapsed: _elapsed,
@@ -361,8 +396,13 @@ class _SessionScreenState extends State<SessionScreen> {
 class _Countdown extends StatelessWidget {
   final int count;
   final Exercise exercise;
+  final String promptText;
 
-  const _Countdown({required this.count, required this.exercise});
+  const _Countdown({
+    required this.count,
+    required this.exercise,
+    required this.promptText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -378,7 +418,7 @@ class _Countdown extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              exercise.prompt,
+              promptText,
               textAlign: TextAlign.center,
               style: text.bodyMedium,
             ),
@@ -1087,6 +1127,29 @@ class _Thinking extends StatelessWidget {
           Text('Vox está pensando…', style: text.titleMedium),
           const SizedBox(height: 20),
           // The brand eq-motif doubles as the loading pulse.
+          EqWaveform(height: 28, barWidth: 5, color: tokens.accent),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingChallenge extends StatelessWidget {
+  final AppTokens tokens;
+
+  const _LoadingChallenge({required this.tokens});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Vox(mood: VoxMood.thinking, size: 96),
+          const SizedBox(height: 28),
+          Text('Preparando tu reto personalizado…', style: text.titleMedium),
+          const SizedBox(height: 20),
           EqWaveform(height: 28, barWidth: 5, color: tokens.accent),
         ],
       ),

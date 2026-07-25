@@ -48,6 +48,31 @@ class SavedResult {
       );
 }
 
+/// A cosmetic rewrite of one exercise's title/prompt/hint — never its `id`,
+/// `targetSkill` or `targetDuration`. Produced by Gemma from the child's AI
+/// profile (see `personalized-exercises`), one exercise at a time.
+class PersonalizedExercise {
+  final String title;
+  final String prompt;
+  final String hint;
+
+  const PersonalizedExercise({
+    required this.title,
+    required this.prompt,
+    required this.hint,
+  });
+
+  Map<String, dynamic> toJson() =>
+      {'title': title, 'prompt': prompt, 'hint': hint};
+
+  factory PersonalizedExercise.fromJson(Map<String, dynamic> j) =>
+      PersonalizedExercise(
+        title: j['title'] as String,
+        prompt: j['prompt'] as String,
+        hint: j['hint'] as String,
+      );
+}
+
 /// Fully-local persistence for profiles and results, backed by
 /// shared_preferences (JSON). Chosen over drift deliberately: the data is a
 /// handful of profiles and a list of results per child — a SQLite database
@@ -56,6 +81,9 @@ class SavedResult {
 class LocalStore {
   static const _kProfiles = 'profiles';
   static String _resultsKey(String profileId) => 'results.$profileId';
+  static String _aiProfileKey(String profileId) => 'aiProfile.$profileId';
+  static String _personalizedExercisesKey(String profileId) =>
+      'personalizedExercises.$profileId';
 
   final SharedPreferences _prefs;
   const LocalStore(this._prefs);
@@ -113,6 +141,54 @@ class LocalStore {
       jsonEncode(all.map((p) => p.toJson()).toList()),
     );
     await _prefs.remove(_resultsKey(id));
+    await _prefs.remove(_aiProfileKey(id));
+    await _prefs.remove(_personalizedExercisesKey(id));
+  }
+
+  // ---- AI Profile ----
+
+  String? getAiProfile(String profileId) {
+    return _prefs.getString(_aiProfileKey(profileId));
+  }
+
+  Future<void> saveAiProfile(String profileId, String profileJson) async {
+    await _prefs.setString(_aiProfileKey(profileId), profileJson);
+  }
+
+  // ---- Personalized exercises ----
+
+  Map<String, PersonalizedExercise> getAllPersonalizedExercises(
+    String profileId,
+  ) {
+    final raw = _prefs.getString(_personalizedExercisesKey(profileId));
+    if (raw == null) return const {};
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    return map.map(
+      (id, j) => MapEntry(
+        id,
+        PersonalizedExercise.fromJson(j as Map<String, dynamic>),
+      ),
+    );
+  }
+
+  PersonalizedExercise? getPersonalizedExercise(
+    String profileId,
+    String exerciseId,
+  ) =>
+      getAllPersonalizedExercises(profileId)[exerciseId];
+
+  /// Upserts a single exercise's override without touching the others.
+  Future<void> savePersonalizedExercise(
+    String profileId,
+    String exerciseId,
+    PersonalizedExercise override,
+  ) async {
+    final all = {...getAllPersonalizedExercises(profileId)};
+    all[exerciseId] = override;
+    await _prefs.setString(
+      _personalizedExercisesKey(profileId),
+      jsonEncode(all.map((id, e) => MapEntry(id, e.toJson()))),
+    );
   }
 
   // ---- Results ----

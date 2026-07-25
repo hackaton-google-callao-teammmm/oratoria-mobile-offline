@@ -13,6 +13,24 @@ class _ExplodingCoach implements CoachFeedbackGenerator {
   }) async {
     throw StateError('out of memory');
   }
+
+  @override
+  Future<String> generateInitialChallenge(String? aiProfile) async {
+    throw StateError('out of memory');
+  }
+
+  @override
+  Future<(CoachFeedback feedback, String? updatedAiProfile)> generateWithProfile({
+    required ParaverbalMetrics voice,
+    required BodyMetrics body,
+    required Exercise exercise,
+    bool voiceTrusted = true,
+    bool pausesTrusted = true,
+    String? aiProfile,
+    String? transcript,
+  }) async {
+    throw StateError('out of memory');
+  }
 }
 
 /// Stands in for a healthy on-device model.
@@ -34,6 +52,31 @@ class _FakeLlmCoach implements CoachFeedbackGenerator {
         improvementBody: 'Prosa cálida generada por el modelo.',
         source: FeedbackSource.onDeviceLlm,
       );
+
+  @override
+  Future<String> generateInitialChallenge(String? aiProfile) async =>
+      '¡Hola! Soy Vox. ¿Cuál es tu dinosaurio favorito?';
+
+  @override
+  Future<(CoachFeedback feedback, String? updatedAiProfile)> generateWithProfile({
+    required ParaverbalMetrics voice,
+    required BodyMetrics body,
+    required Exercise exercise,
+    bool voiceTrusted = true,
+    bool pausesTrusted = true,
+    String? aiProfile,
+    String? transcript,
+  }) async {
+    final fb = await generate(
+      voice: voice,
+      body: body,
+      exercise: exercise,
+      voiceTrusted: voiceTrusted,
+      pausesTrusted: pausesTrusted,
+    );
+    final updated = '{"interests":["dinosaurios"]}';
+    return (fb, updated);
+  }
 }
 
 void main() {
@@ -91,6 +134,18 @@ void main() {
 
       expect(result.stars, inInclusiveRange(1, 5));
       expect(result.feedback.strengthBody, isNotEmpty);
+    });
+
+    test('passes aiProfile and returns updatedAiProfile when available', () async {
+      final evaluate = EvaluatePractice(coach: _FakeLlmCoach());
+
+      final result = await evaluate(
+        transcript: 'me gustan los dinosaurios rex',
+        speakingDuration: const Duration(seconds: 10),
+        aiProfile: '{"interests":[]}',
+      );
+
+      expect(result.updatedAiProfile, contains('dinosaurios'));
     });
 
     test('runs audio-only when there is no camera', () async {

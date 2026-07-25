@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:oratoria_core/oratoria_core.dart';
 
+import '../../adapters/coach/exercise_personalizer.dart';
+import '../../app/config/feature_flags.dart';
 import '../../app/theme/tokens.dart';
+import '../../data/local_store.dart';
 import '../../shared/brand/aurora_background.dart';
 import '../../shared/ui/eyebrow.dart';
 import '../../shared/ui/glass_card.dart';
@@ -26,6 +31,20 @@ class ReportScreen extends StatelessWidget {
   /// Gemma. Shown as a card here instead of a blocking screen before the report,
   /// so it's the "wow" without gating the payoff. Null → the card is omitted.
   final String? audienceQuestion;
+  /// Needed only for `personalized-exercises`: with both present (and the
+  /// flag on), the "próximo reto" card rewrites its own text in the
+  /// background from the child's AI profile. Null → the card behaves exactly
+  /// as before (static text), which is also what every existing call site
+  /// that predates this feature gets for free.
+  final Profile? profile;
+  final LocalStore? store;
+
+  /// Defaults to the real compile-time flag; overridable so tests can
+  /// exercise the "on" path without flipping the production default.
+  final bool personalizedExercises;
+
+  /// Defaults to the production Gemma wiring when null; overridable in tests.
+  final ExercisePersonalizer? exercisePersonalizer;
 
   const ReportScreen({
     super.key,
@@ -33,6 +52,10 @@ class ReportScreen extends StatelessWidget {
     required this.onPracticeAgain,
     this.onStartExercise,
     this.audienceQuestion,
+    this.profile,
+    this.store,
+    this.personalizedExercises = FeatureFlags.personalizedExercises,
+    this.exercisePersonalizer,
   });
 
   @override
@@ -131,6 +154,10 @@ class ReportScreen extends StatelessWidget {
               _NextChallengeCard(
                 suggestion: suggestNextChallenge(result),
                 onStart: onStartExercise,
+                profile: profile,
+                store: store,
+                personalizeEnabled: personalizedExercises,
+                personalizer: exercisePersonalizer,
               ),
               const SizedBox(height: 8),
               // Secondary: free choice back at the chooser — autonomy matters.
@@ -251,18 +278,79 @@ class _GoalBanner extends StatelessWidget {
 /// chosen by [ChallengeSuggestion.kind] so a proxy or a repeat never overclaims.
 /// When [onStart] is null it degrades to a plain suggestion (the tap is a thin,
 /// removable layer).
-class _NextChallengeCard extends StatelessWidget {
+///
+/// Stateful only for `personalized-exercises`: on mount it may kick off (in
+/// the background, never blocking this build) a rewrite of the recommended
+/// exercise's title/prompt/hint from the child's AI profile. The button
+/// always starts [suggestion.exercise] — the untouched original — so
+/// "Continuar" never waits on Gemma and the next session's scoring/duration
+/// never changes; only the text shown here is cosmetic and swappable.
+class _NextChallengeCard extends StatefulWidget {
   final ChallengeSuggestion suggestion;
   final void Function(Exercise exercise)? onStart;
+  final Profile? profile;
+  final LocalStore? store;
+  final bool personalizeEnabled;
+  final ExercisePersonalizer? personalizer;
 
-  const _NextChallengeCard({required this.suggestion, this.onStart});
+  const _NextChallengeCard({
+    required this.suggestion,
+    this.onStart,
+    this.profile,
+    this.store,
+    this.personalizeEnabled = false,
+    this.personalizer,
+  });
+
+  @override
+  State<_NextChallengeCard> createState() => _NextChallengeCardState();
+}
+
+class _NextChallengeCardState extends State<_NextChallengeCard> {
+  PersonalizedExercise? _personalized;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybePersonalize();
+  }
+
+  void _maybePersonalize() {
+    final profile = widget.profile;
+    final store = widget.store;
+    if (!widget.personalizeEnabled || profile == null || store == null) return;
+
+    final ex = widget.suggestion.exercise;
+    if (ex.id == 'e-libre') return; // "Práctica libre" is never reescrita.
+
+    final cached = store.getPersonalizedExercise(profile.id, ex.id);
+    if (cached != null) {
+      // Already personalized in a past session — show it, no new Gemma call.
+      setState(() => _personalized = cached);
+      return;
+    }
+
+    final aiProfile = store.getAiProfile(profile.id);
+    if (!_hasRealProfileContent(aiProfile)) return;
+
+    final personalizer = widget.personalizer ?? ExercisePersonalizer.gemma();
+    personalizer.personalize(ex, aiProfile).then((out) async {
+      if (out == null) return;
+      await store.savePersonalizedExercise(profile.id, ex.id, out);
+      if (mounted) setState(() => _personalized = out);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final ex = suggestion.exercise;
-    final dim = suggestion.forDimension?.label ?? '';
-    final (eyebrow, body, cta) = _copy(ex, dim);
+    // Always the untouched original — the personalized text below is purely
+    // cosmetic and never leaks into what "Continuar" actually starts.
+    final ex = widget.suggestion.exercise;
+    final title = _personalized?.title ?? ex.title;
+    final hint = _personalized?.hint ?? ex.targetHint;
+    final dim = widget.suggestion.forDimension?.label ?? '';
+    final (eyebrow, body, cta) = _copy(dim, title: title, hint: hint);
 
     return Container(
       width: double.infinity,
@@ -278,7 +366,7 @@ class _NextChallengeCard extends StatelessWidget {
           Eyebrow(eyebrow, color: t.accent),
           const SizedBox(height: 6),
           Text(
-            ex.title,
+            title,
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -287,12 +375,12 @@ class _NextChallengeCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(body, style: TextStyle(color: t.inkSoft, height: 1.35)),
-          if (onStart != null) ...[
+          if (widget.onStart != null) ...[
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => onStart!(ex),
+                onPressed: () => widget.onStart!(ex),
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: Text(cta),
               ),
@@ -305,29 +393,50 @@ class _NextChallengeCard extends StatelessWidget {
 
   /// (eyebrow, body, cta) per kind — honest wording: proxy only "helps with",
   /// diagnostic invents no cause, reinforce frames repetition as coaching.
-  (String, String, String) _copy(Exercise ex, String dim) =>
-      switch (suggestion.kind) {
+  (String, String, String) _copy(
+    String dim, {
+    required String title,
+    required String hint,
+  }) =>
+      switch (widget.suggestion.kind) {
         SuggestionKind.causal => (
             'Tu próximo reto',
             'Tu punto flojo fue tu $dim, y este reto lo entrena. ¡Vamos por eso!',
-            'Empezar ${ex.title}',
+            'Empezar $title',
           ),
         SuggestionKind.reinforce => (
             'Sigue puliendo tu $dim',
-            'Todavía puedes mejorarlo. Repite este reto — esta vez: ${ex.targetHint}',
-            'Repetir ${ex.title}',
+            'Todavía puedes mejorarlo. Repite este reto — esta vez: $hint',
+            'Repetir $title',
           ),
         SuggestionKind.proxy => (
             'Tu próximo reto',
             'Un reto que te ayuda con tus $dim.',
-            'Empezar ${ex.title}',
+            'Empezar $title',
           ),
         SuggestionKind.diagnostic => (
             'Sigue calentando',
             'Un buen reto para tomar impulso y que te escuchemos mejor.',
-            'Empezar ${ex.title}',
+            'Empezar $title',
           ),
       };
+}
+
+/// Gate before spending a Gemma call: an empty/near-empty AI profile (right
+/// after the child's first practice) would just make the model invent
+/// something generic. `LocalStore` stores this as a JSON string; parsed
+/// defensively since it may be model output from a small on-device LLM.
+bool _hasRealProfileContent(String? aiProfile) {
+  if (aiProfile == null || aiProfile.trim().isEmpty) return false;
+  try {
+    final decoded = jsonDecode(aiProfile);
+    if (decoded is! Map<String, dynamic>) return false;
+    bool nonEmptyList(dynamic v) => v is List && v.isNotEmpty;
+    return nonEmptyList(decoded['interests']) ||
+        nonEmptyList(decoded['strengths']);
+  } catch (_) {
+    return false;
+  }
 }
 
 /// "Lo que escuché" — the real transcript, proof the app listened. Deliberately

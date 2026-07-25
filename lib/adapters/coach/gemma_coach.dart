@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oratoria_core/oratoria_core.dart';
 
 import 'gemma_service.dart';
@@ -36,6 +38,83 @@ class GemmaCoach implements CoachFeedbackGenerator {
           timeout: const Duration(seconds: 10),
         ),
       );
+
+  @override
+  Future<String> generateInitialChallenge(String? aiProfile) async {
+    try {
+      final prompt = _initialChallengePrompt(aiProfile);
+      final raw = await _rewrite(prompt);
+      if (raw == null || raw.trim().isEmpty) {
+        return _base.generateInitialChallenge(aiProfile);
+      }
+      return raw.trim();
+    } catch (_) {
+      return _base.generateInitialChallenge(aiProfile);
+    }
+  }
+
+  @override
+  Future<(CoachFeedback feedback, String? updatedAiProfile)> generateWithProfile({
+    required ParaverbalMetrics voice,
+    required BodyMetrics body,
+    required Exercise exercise,
+    bool voiceTrusted = true,
+    bool pausesTrusted = true,
+    String? aiProfile,
+    String? transcript,
+  }) async {
+    final baseFeedback = await generate(
+      voice: voice,
+      body: body,
+      exercise: exercise,
+      voiceTrusted: voiceTrusted,
+      pausesTrusted: pausesTrusted,
+    );
+
+    if (transcript == null || transcript.trim().isEmpty) {
+      return (baseFeedback, aiProfile);
+    }
+
+    try {
+      final prompt = _profileUpdatePrompt(aiProfile, transcript);
+      final rawJson = await _rewrite(prompt);
+      final validJson = _cleanAndValidateJson(rawJson);
+      return (baseFeedback, validJson ?? aiProfile);
+    } catch (_) {
+      return (baseFeedback, aiProfile);
+    }
+  }
+
+  String _initialChallengePrompt(String? aiProfile) {
+    if (aiProfile == null || aiProfile.trim().isEmpty) {
+      return 'Eres Vox, un entrenador de oratoria cálido para niños. '
+          'Crea un reto inicial corto de bienvenida (1-2 frases). '
+          'Saluda con entusiasmo y pídele al niño que te diga su nombre, su edad y su animal favorito.';
+    }
+    return 'Eres Vox, un entrenador de oratoria cálido para niños. '
+        'Aquí está el perfil actual del niño en JSON:\n$aiProfile\n'
+        'Crea un reto de oratoria corto y divertido (1-2 frases) personalizado según sus intereses o fortalezas para esta sesión.';
+  }
+
+  String _profileUpdatePrompt(String? currentProfile, String transcript) =>
+      'Eres Vox. Analiza lo que dijo el niño en su práctica:\n'
+      'Transcripción: "$transcript"\n'
+      'Perfil actual JSON: ${currentProfile ?? "{}"}\n\n'
+      'Actualiza el perfil del niño extrayendo nuevos intereses, fortalezas o aspectos a mejorar.\n'
+      'Responde ÚNICAMENTE con un objeto JSON válido con este formato exacto, sin markdown ni explicaciones:\n'
+      '{"name":"","age":"","interests":[],"strengths":[],"weaknesses":[]}';
+
+  String? _cleanAndValidateJson(String? raw) {
+    if (raw == null) return null;
+    final cleaned = raw.replaceAll('```json', '').replaceAll('```', '').trim();
+    try {
+      final decoded = jsonDecode(cleaned);
+      if (decoded is Map<String, dynamic>) {
+        return jsonEncode(decoded);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   @override
   Future<CoachFeedback> generate({

@@ -75,6 +75,48 @@ class RuleBasedCoach implements CoachFeedbackGenerator {
     );
   }
 
+  @override
+  Future<String> generateInitialChallenge(String? aiProfile) async {
+    if (aiProfile == null || aiProfile.trim().isEmpty) {
+      return '¡Hola! Soy Vox, tu entrenador de oratoria. ¿Cómo te llamas, cuántos años tienes y cuál es tu animal favorito?';
+    }
+    final challenges = [
+      '¡Hola de nuevo! Cuéntame en voz alta cuál fue la parte más divertida de tu día.',
+      '¡Hola! Si pudieras tener un superpoder por un día, ¿cuál elegirías y por qué?',
+      '¡Hola! Cuéntame sobre tu juego o juguete favorito y por qué te gusta tanto.',
+      '¡Hola! Platícame sobre tu comida o postre preferido como si fueras un chef.',
+    ];
+    final index = DateTime.now().millisecondsSinceEpoch % challenges.length;
+    return challenges[index];
+  }
+
+  @override
+  Future<(CoachFeedback feedback, String? updatedAiProfile)> generateWithProfile({
+    required ParaverbalMetrics voice,
+    required BodyMetrics body,
+    required Exercise exercise,
+    bool voiceTrusted = true,
+    bool pausesTrusted = true,
+    String? aiProfile,
+    String? transcript,
+  }) async {
+    final fb = await generate(
+      voice: voice,
+      body: body,
+      exercise: exercise,
+      voiceTrusted: voiceTrusted,
+      pausesTrusted: pausesTrusted,
+    );
+    // No real profiling without Gemma, but a null/empty profile must still
+    // flip to non-empty after the first practice — otherwise
+    // generateInitialChallenge() keeps taking the "first time" branch
+    // forever and the child never reaches the rotating generic challenges
+    // (see design.md's documented fallback behaviour).
+    final profile =
+        (aiProfile == null || aiProfile.trim().isEmpty) ? '{}' : aiProfile;
+    return (fb, profile);
+  }
+
   // ---------------------------------------------------------------- strengths
 
   String _strengthTitle(Dimension d) => switch (d) {

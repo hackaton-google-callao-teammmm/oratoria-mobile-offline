@@ -181,4 +181,39 @@ void main() {
     );
     expect(called, isFalse);
   });
+
+  test('generateInitialChallenge uses profile or fallback icebreaker', () async {
+    final coach = GemmaCoach(rewrite: (prompt) async {
+      if (prompt.contains('dinosaurio')) {
+        return '¡Hola! Hablemos sobre tu dinosaurio favorito.';
+      }
+      return '¡Hola! ¿Cómo te llamas?';
+    });
+
+    final emptyChallenge = await coach.generateInitialChallenge(null);
+    expect(emptyChallenge, contains('¿Cómo te llamas?'));
+
+    final profileChallenge = await coach.generateInitialChallenge('{"interests":["dinosaurio"]}');
+    expect(profileChallenge, contains('dinosaurio'));
+  });
+
+  test('generateWithProfile extracts updated profile JSON', () async {
+    final coach = GemmaCoach(rewrite: (prompt) async {
+      if (prompt.contains('FORTALEZA')) {
+        return 'FORTALEZA: x\nMEJORA: y';
+      }
+      return '```json\n{"name":"Ana","age":"10","interests":["space"]}\n```';
+    });
+
+    final (fb, updated) = await coach.generateWithProfile(
+      voice: _voice(),
+      body: BodyMetrics.none,
+      exercise: Exercise.free,
+      aiProfile: '{}',
+      transcript: 'Me gusta el espacio exterior',
+    );
+
+    expect(fb.strengthBody, isNotEmpty);
+    expect(updated, contains('space'));
+  });
 }
