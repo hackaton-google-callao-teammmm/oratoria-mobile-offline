@@ -97,6 +97,16 @@ class _VoxPainter extends CustomPainter {
   /// `onLime` is constant across themes, so the face never loses contrast.
   Color get _dark => t.onLime;
 
+  /// Sticker-style edge around the plumage, in the palette's own `accent`:
+  /// deep olive on the light theme — where a lime bird would otherwise melt
+  /// into the cream/aurora background — and lime on dark, where the body
+  /// already contrasts and the edge quietly disappears. Same trick the design
+  /// system uses for lime-as-text.
+  Paint _edge([double width = 1.5]) => Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width
+    ..color = t.accent;
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -154,13 +164,15 @@ class _VoxPainter extends CustomPainter {
       canvas.save();
       canvas.translate(50, 72);
       canvas.rotate(angle);
+      final feather = RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-3.5, 0, 7, 19),
+        const Radius.circular(3.5),
+      );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-3.5, 0, 7, 19),
-          const Radius.circular(3.5),
-        ),
+        feather,
         Paint()..color = Color.lerp(t.limeDim, Colors.black, shade)!,
       );
+      canvas.drawRRect(feather, _edge(1.2));
       canvas.restore();
     }
   }
@@ -208,6 +220,7 @@ class _VoxPainter extends CustomPainter {
       const Radius.circular(5.5),
     );
     canvas.drawRRect(wing, Paint()..color = t.limeDim);
+    canvas.drawRRect(wing, _edge(1.4));
     // Elbow seam — an articulated joint, not a feather line.
     canvas.drawLine(
       const Offset(-4, 12),
@@ -224,11 +237,16 @@ class _VoxPainter extends CustomPainter {
     // Head circle + egg body fused into one silhouette, lit from the top like
     // the rest of the UI's cards. Lime is constant across themes — Vox is the
     // brand made animate.
-    final silhouette = Path()
-      ..addOval(Rect.fromCircle(center: const Offset(50, 33), radius: 23))
-      ..addOval(
-        Rect.fromCenter(center: const Offset(50, 60), width: 54, height: 50),
-      );
+    // True union (not two stacked ovals) so the outline strokes only the
+    // outer silhouette, never the seam where head meets body.
+    final silhouette = Path.combine(
+      PathOperation.union,
+      Path()..addOval(Rect.fromCircle(center: const Offset(50, 33), radius: 23)),
+      Path()
+        ..addOval(
+          Rect.fromCenter(center: const Offset(50, 60), width: 54, height: 50),
+        ),
+    );
     final bounds = silhouette.getBounds();
     canvas.drawPath(
       silhouette.shift(const Offset(0, 1.6)),
@@ -250,6 +268,7 @@ class _VoxPainter extends CustomPainter {
           stops: const [0.0, 0.55, 1.0],
         ).createShader(bounds),
     );
+    canvas.drawPath(silhouette, _edge(1.6));
     // Glossy highlight over the head — same treatment the old blob had.
     canvas.drawArc(
       Rect.fromCircle(center: const Offset(50, 31), radius: 17),
@@ -278,13 +297,12 @@ class _VoxPainter extends CustomPainter {
       canvas.save();
       canvas.translate(x, 14);
       canvas.rotate(angle);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-2, -9, 4, 12),
-          const Radius.circular(2),
-        ),
-        Paint()..color = t.limeDim,
+      final plume = RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-2, -9, 4, 12),
+        const Radius.circular(2),
       );
+      canvas.drawRRect(plume, Paint()..color = t.limeDim);
+      canvas.drawRRect(plume, _edge(1.1));
       canvas.restore();
     }
     canvas.drawLine(
