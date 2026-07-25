@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="480" viewBox="0 0 800 240" fill="none">
+  <style>
+    .word {
+      font-family: 'Archivo', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 120px;
+      font-weight: 800;
+      letter-spacing: -4px;
+    }
+  </style>
+  <g transform="translate(40, 60)">
+    <circle cx="60" cy="60" r="56" fill="#C6FF3D"></circle>
+    <rect x="34" y="48" width="8" height="24" rx="4" fill="#0A0A0A"></rect>
+    <rect x="48" y="38" width="8" height="44" rx="4" fill="#0A0A0A"></rect>
+    <rect x="62" y="30" width="8" height="60" rx="4" fill="#0A0A0A"></rect>
+    <rect x="76" y="38" width="8" height="44" rx="4" fill="#0A0A0A"></rect>
+    <rect x="90" y="48" width="8" height="24" rx="4" fill="#0A0A0A"></rect>
+  </g>
+  <text x="196" y="162" class="word" fill="#0A0A0A">Orator<tspan fill="#4D7C0F">IA</tspan></text>
+</svg>

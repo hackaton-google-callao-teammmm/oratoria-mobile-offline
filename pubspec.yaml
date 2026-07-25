@@ -1,0 +1,76 @@
+name: oratoria_kids
+description: "Practica oratoria sin internet. Todo el analisis ocurre en el dispositivo."
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # The coaching engine. Pure Dart, no Flutter, no AI SDK — every rule that
+  # produces value lives here so it can be tested without a device and can
+  # never be broken by a plugin upgrade.
+  oratoria_core:
+    path: packages/oratoria_core
+  flutter_gemma: ^0.16.5
+  path_provider: ^2.1.6
+  record: ^6.2.1
+  path: ^1.9.1
+  shared_preferences: ^2.5.5
+  camera: ^0.12.0+2
+  google_mlkit_face_detection: ^0.14.0
+  sherpa_onnx: ^1.13.4
+
+  # Live caption STT (offline, streaming, word-level Spanish). Behind the
+  # FeatureFlags.liveCaption flag (default off) until proven on the A12.
+  # vosk_flutter_2 (maintained fork) — the original vosk_flutter pins http
+  # ^0.13, which collides with flutter_gemma's http ^1.x.
+  vosk_flutter_2: ^1.0.5
+
+  # Phase 1 dependencies are added as each phase lands, deliberately:
+  #   record          — PCM16 microphone stream (phase 1)
+  #   drift + sqlite3 — local database        (phase 1)
+  #   sherpa_onnx     — on-device STT         (phase 2)
+  #   camera + ML Kit — body language         (phase 3)
+  #   flutter_gemma   — on-device coaching    (phase 4)
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/brand/
+
+  # Bundled so the brand type works fully offline — no runtime font download.
+  # Both are variable fonts (weight axis); Flutter picks the nearest instance
+  # per FontWeight, so a single .ttf covers every weight the UI uses.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf
+
+# App launcher icon — the OratorIA brand mark.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  # Legacy / round icon: the fully-framed brand app icon.
+  image_path: "assets/brand/OratorIA-app-icon-1024.png"
+  # Adaptive icon (Android 8+): the isotype over the brand-dark background,
+  # so the system mask crops cleanly.
+  adaptive_icon_background: "#0A0B08"
+  adaptive_icon_foreground: "assets/brand/OratorIA-app-icon-1024.png"
