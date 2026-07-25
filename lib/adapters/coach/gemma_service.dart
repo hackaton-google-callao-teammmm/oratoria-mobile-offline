@@ -104,8 +104,17 @@ class GemmaService {
       return await () async {
         session = await model.createSession(temperature: 0.8, randomSeed: 1);
         await session!.addQueryChunk(Message.text(text: prompt, isUser: true));
-        final out = await session!.getResponse();
-        return out.trim();
+        // Stream the tokens (getResponseAsync) instead of getResponse(): the
+        // sync path calls MediaPipe's nativePredictSync ON THE MAIN/UI THREAD,
+        // freezing it for the whole inference → an ANR that Android kills as a
+        // "crash" (confirmed on-device in the `_finish` beat). The async path
+        // runs generation off the UI thread and yields tokens, so the session
+        // never freezes.
+        final buffer = StringBuffer();
+        await for (final token in session!.getResponseAsync()) {
+          buffer.write(token);
+        }
+        return buffer.toString().trim();
       }()
           .timeout(timeout);
     } catch (_) {
