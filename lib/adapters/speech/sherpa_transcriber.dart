@@ -4,14 +4,18 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
-/// On-device speech-to-text via sherpa-onnx (Whisper tiny, Spanish). Closes the
-/// last mock: instead of a canned transcript, the paraverbal analysis now runs
-/// on what the child actually said, so filler counts and pace are real.
+/// On-device speech-to-text via sherpa-onnx (multilingual Whisper, Spanish).
+/// Closes the last mock: instead of a canned transcript, the paraverbal analysis
+/// now runs on what the child actually said, so filler counts and pace are real.
 ///
-/// Fully offline: the ONNX runtime is bundled in the APK; the model is
-/// sideloaded (adb push) like Gemma. Defensive like everything else — if the
-/// model is missing or loading fails, [transcribe] returns null and the caller
-/// falls back, so the session never breaks (golden rule).
+/// Picks the best model the phone can hold from a ladder (small → base → tiny),
+/// gated by free RAM — a roomy phone gets `small` (best accuracy), a cramped one
+/// steps down cleanly instead of OOM-killing.
+///
+/// Fully offline: the ONNX runtime is bundled in the APK; the model files are
+/// sideloaded like Gemma. Defensive like everything else — if no model is
+/// present or loading fails, [transcribe] returns null and the caller falls
+/// back, so the session never breaks (golden rule).
 class SherpaTranscriber {
   SherpaTranscriber._();
   static final SherpaTranscriber instance = SherpaTranscriber._();
@@ -22,21 +26,26 @@ class SherpaTranscriber {
   /// words the model never transcribed.
   static const maxAudioWindow = Duration(seconds: 30);
 
-  // Two Whisper models, sideloaded (adb push) to the app's external files dir.
-  // Prefer `base` (much better than `tiny` for a child's accented Spanish); fall
-  // back to `tiny` when base isn't present or won't fit in RAM. Use the
-  // MULTILINGUAL base, never `base.en` (English-only would be worse for Spanish).
+  // Whisper models, sideloaded to the app's external files dir. All are the
+  // MULTILINGUAL variants (never `.en`, which would be worse for Spanish).
+  static const _prefSmall = 'small';
   static const _prefBase = 'base';
   static const _prefTiny = 'tiny';
 
-  /// Skip loading `base` when free RAM is under this — its runtime peak (ONNX
-  /// session + weights + activation buffers, alongside a resident Gemma) is far
-  /// above its ~150 MB file, and a hard OOM-kill (LMKD → SIGKILL) is NOT a
-  /// catchable Dart error. The gate lowers that probability; it is not a
-  /// guarantee (TOCTOU), so the try/catch below stays and the device is the
-  /// final arbiter. Tune on the A12: too low → OOM, too high → silently stuck
-  /// on tiny. Confirm the log says `whisper: base` before trusting base.
-  static const _ramGateMb = 750;
+  /// Model ladder, best → safest. Each entry is (file prefix, minimum free RAM
+  /// in MB to even attempt loading it). Whisper's runtime peak (ONNX sessions +
+  /// weights + activation + KV cache, alongside a resident Gemma) is far above
+  /// its file size, and a hard OOM-kill (LMKD → SIGKILL) is NOT a catchable Dart
+  /// error — so the gate converts "would OOM" into a clean step down instead of
+  /// a crash. It is not a guarantee (TOCTOU); the try/catch below stays and the
+  /// device is the final arbiter. `tiny`'s gate is 0: the last-resort fallback
+  /// must always be allowed to try. Tune the gates on the real presentation
+  /// phone, and read the log to see which model actually won.
+  static const _ladder = <(String, int)>[
+    (_prefSmall, 1400), // ~460 MB files — best accuracy, needs a roomy phone
+    (_prefBase, 750), //   ~160 MB files — a big step over tiny
+    (_prefTiny, 0), //     ~100 MB files — always-safe fallback
+  ];
 
   /// Extra tail padding (samples @16 kHz) fed to Whisper — a modest amount can
   /// curb end-of-clip hallucination. A/B on device; set to -1 (sherpa default)
@@ -50,7 +59,8 @@ class SherpaTranscriber {
 
   bool get isAvailable => _recognizer != null;
 
-  /// Which model is actually loaded ('base' / 'tiny' / 'none') — for the log.
+  /// Which model is actually loaded ('small' / 'base' / 'tiny' / 'none') —
+  /// surfaced for the log so we can confirm the best one won.
   String get activeModel => _active;
 
   Future<void> _ensureLoaded() async {
@@ -60,34 +70,36 @@ class SherpaTranscriber {
       final dir = await getExternalStorageDirectory();
       if (dir == null) return;
       final path = dir.path;
+      final ramMb = _availableRamMb();
 
-      final baseReady = _modelPresent(path, _prefBase);
-      final tinyReady = _modelPresent(path, _prefTiny);
-      final ramOk = _availableRamMb() >= _ramGateMb;
-
-      String reason;
-      if (baseReady && ramOk) {
-        _recognizer = _tryCreate(path, _prefBase);
-        if (_recognizer != null) {
-          _active = 'base';
-          _log('whisper: base');
-          return;
+      // Descend the ladder: load the best model that is BOTH present AND fits
+      // RAM. Record why each better one was skipped so the log tells the whole
+      // story ("whisper: base (skipped small: missing)").
+      final skipped = <String>[];
+      for (final (prefix, gateMb) in _ladder) {
+        if (!_modelPresent(path, prefix)) {
+          skipped.add('$prefix: missing');
+          continue;
         }
-        reason = 'base init failed';
-      } else if (baseReady && !ramOk) {
-        reason = 'RAM gate';
-      } else {
-        reason = 'base missing';
-      }
-
-      // Fall back to tiny — already sideloaded, lighter, keeps the session alive.
-      if (tinyReady) {
-        _recognizer = _tryCreate(path, _prefTiny);
-        if (_recognizer != null) {
-          _active = 'tiny';
-          _log('whisper: tiny ($reason)');
+        if (ramMb < gateMb) {
+          skipped.add('$prefix: RAM gate ($ramMb MB < $gateMb)');
+          continue;
         }
+        final rec = _tryCreate(path, prefix);
+        if (rec == null) {
+          skipped.add('$prefix: init failed');
+          continue;
+        }
+        _recognizer = rec;
+        _active = prefix;
+        _log(skipped.isEmpty
+            ? 'whisper: $prefix'
+            : 'whisper: $prefix (skipped ${skipped.join('; ')})');
+        return;
       }
+      // Nothing loaded — no model sideloaded (or all init-failed). The caller
+      // falls back to the sample transcript and the session survives.
+      _log('whisper: none (${skipped.join('; ')})');
     } catch (_) {
       _recognizer = null;
     }
