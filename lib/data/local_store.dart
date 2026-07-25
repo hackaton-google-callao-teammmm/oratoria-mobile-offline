@@ -210,4 +210,16 @@ class LocalStore {
       jsonEncode(all.map((r) => r.toJson()).toList()),
     );
   }
+
+  // ---- Feature Flags Overrides ----
+
+  static String _flagKey(String key) => 'flag.$key';
+
+  bool getFlag(String flagKey, {required bool defaultValue}) {
+    return _prefs.getBool(_flagKey(flagKey)) ?? defaultValue;
+  }
+
+  Future<void> setFlag(String flagKey, bool enabled) async {
+    await _prefs.setBool(_flagKey(flagKey), enabled);
+  }
 }

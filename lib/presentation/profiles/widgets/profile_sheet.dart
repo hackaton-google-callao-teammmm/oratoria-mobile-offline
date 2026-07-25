@@ -9,6 +9,7 @@ import '../../../shared/avatars.dart';
 import '../../../shared/characters/vox.dart';
 import '../../../shared/ui/eyebrow.dart';
 import '../../../shared/ui/glass_card.dart';
+import '../../settings/settings_screen.dart';
 
 /// A Caravaggio-style bottom sheet showing the child's profile info and the
 /// insights Vox has learned about them across practice sessions.
@@ -247,7 +248,20 @@ class ProfileSheet extends StatelessWidget {
               const SizedBox(height: 24),
             ],
 
-            // Switch Profile Button
+            // Action buttons
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SettingsScreen(store: store),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.settings_rounded, size: 20),
+              label: const Text('Configuración de la app'),
+            ),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();

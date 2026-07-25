@@ -1,3 +1,5 @@
+import '../../data/local_store.dart';
+
 /// Compile-time feature flags.
 ///
 /// With no git branches available, this file is how experimental work stays
@@ -39,4 +41,16 @@ abstract final class FeatureFlags {
   /// cost (one more call to the same singleton Gemma model) can be measured
   /// and toggled independently before it ships.
   static const bool personalizedExercises = false;
+
+  static bool isLiveCaption([LocalStore? store]) =>
+      store?.getFlag('liveCaption', defaultValue: liveCaption) ?? liveCaption;
+
+  static bool isGemmaFeedback([LocalStore? store]) =>
+      store?.getFlag('gemmaFeedback', defaultValue: gemmaFeedback) ??
+      gemmaFeedback;
+
+  static bool isPersonalizedExercises([LocalStore? store]) =>
+      store?.getFlag('personalizedExercises',
+          defaultValue: personalizedExercises) ??
+      personalizedExercises;
 }
