@@ -27,7 +27,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore(await SharedPreferences.getInstance());
 
-    expect(FeatureFlags.isLiveCaption(store), isFalse);
+    // liveCaption ships ON by default (motor-inferencia-presentacion) — no
+    // override saved yet, so this reads the compile-time default.
+    expect(FeatureFlags.isLiveCaption(store), isTrue);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -39,6 +41,6 @@ void main() {
     await tester.tap(switchFinder);
     await tester.pump();
 
-    expect(FeatureFlags.isLiveCaption(store), isTrue);
+    expect(FeatureFlags.isLiveCaption(store), isFalse);
   });
 }

@@ -7,6 +7,7 @@ import '../../adapters/coach/exercise_personalizer.dart';
 import '../../app/config/feature_flags.dart';
 import '../../app/theme/tokens.dart';
 import '../../data/local_store.dart';
+import '../../data/progress_impact.dart';
 import '../../shared/brand/aurora_background.dart';
 import '../../shared/ui/eyebrow.dart';
 import '../../shared/ui/glass_card.dart';
@@ -69,6 +70,14 @@ class ReportScreen extends StatelessWidget {
     // would print a confident "8 palabras / min".
     final showWords = result.voiceTextTrusted && result.voice.isMeaningful;
 
+    // progress-impact-indicators: compares this practice (assumed already
+    // saved as history[0] by session_screen.dart before this screen ever
+    // builds) against the nearest older confiable entry. Purely derived from
+    // already-persisted data — no Gemma call, no loading state.
+    final impacts = (profile != null && store != null)
+        ? compareToPrevious(store!.resultsFor(profile!.id), 0)
+        : const <ProgressImpact>[];
+
     return Scaffold(
       body: AuroraBackground(
         child: SafeArea(
@@ -130,6 +139,13 @@ class ReportScreen extends StatelessWidget {
                   voiceTextTrusted: showWords,
                   pausesTrusted: result.pausesTrusted,
                 ),
+                const SizedBox(height: 28),
+              ],
+              // Honest comparison against the last confiable practice for
+              // each dimension — omitted entirely when there's nothing real
+              // to compare against yet.
+              if (impacts.isNotEmpty) ...[
+                _ImpactCard(impacts: impacts),
                 const SizedBox(height: 28),
               ],
               // "What I heard" — the exact words the STT recognised. Shown only
@@ -583,6 +599,43 @@ class _FeedbackCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A neutral, factual comparison against the last confiable practice per
+/// dimension — deliberately no "you improved!" framing: a lower filler rate
+/// is unambiguously better, but pace has a comfortable range, not a
+/// direction, so the honest move is to state the numbers and let the
+/// strength/improvement cards above carry the verdict.
+class _ImpactCard extends StatelessWidget {
+  final List<ProgressImpact> impacts;
+
+  const _ImpactCard({required this.impacts});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: t.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: t.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Eyebrow('Comparado con tu práctica anterior'),
+          const SizedBox(height: 8),
+          for (final i in impacts)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(describeImpact(i), style: TextStyle(color: t.inkSoft)),
+            ),
+        ],
+      ),
     );
   }
 }

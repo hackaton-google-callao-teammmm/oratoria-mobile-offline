@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:oratoria_kids/app/theme/theme_controller.dart';
 import 'package:oratoria_kids/data/local_store.dart';
 import 'package:oratoria_kids/presentation/profiles/widgets/profile_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';

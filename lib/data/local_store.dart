@@ -30,21 +30,37 @@ class SavedResult {
   final int stars;
   final int atMillis; // epoch millis, passed in (Date.now is unavailable here)
 
+  /// Voice-only dimensions for `progress-impact-indicators` — null when the
+  /// practice's transcript wasn't confiable (no invented history). No body
+  /// (eye contact/posture) breakdown is persisted — see design.md.
+  final double? wordsPerMinute;
+  final double? fillerRate;
+
   const SavedResult({
     required this.exerciseId,
     required this.score,
     required this.stars,
     required this.atMillis,
+    this.wordsPerMinute,
+    this.fillerRate,
   });
 
-  Map<String, dynamic> toJson() =>
-      {'e': exerciseId, 's': score, 'st': stars, 't': atMillis};
+  Map<String, dynamic> toJson() => {
+        'e': exerciseId,
+        's': score,
+        'st': stars,
+        't': atMillis,
+        'wpm': wordsPerMinute,
+        'fr': fillerRate,
+      };
 
   factory SavedResult.fromJson(Map<String, dynamic> j) => SavedResult(
         exerciseId: j['e'] as String,
         score: j['s'] as int,
         stars: j['st'] as int,
         atMillis: j['t'] as int,
+        wordsPerMinute: (j['wpm'] as num?)?.toDouble(),
+        fillerRate: (j['fr'] as num?)?.toDouble(),
       );
 }
 

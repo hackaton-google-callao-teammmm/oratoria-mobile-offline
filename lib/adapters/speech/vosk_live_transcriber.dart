@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:path_provider/path_provider.dart';
 import 'package:vosk_flutter_2/vosk_flutter_2.dart';
 
 /// Streaming, word-level Spanish STT for the LIVE caption only — Vosk runs
@@ -15,16 +13,20 @@ import 'package:vosk_flutter_2/vosk_flutter_2.dart';
 /// before the Whisper pass, so two ASR models are never resident together on
 /// the A12.
 ///
-/// Defensive like the rest of the pipeline: if the model isn't sideloaded, or
-/// Vosk fails to load, it simply stays dark and the session is unchanged. The
-/// caption is best-effort; it never feeds the report and never breaks the run.
+/// The model ships bundled in the APK (see [_modelAsset]/pubspec.yaml), so it
+/// works out of the box on a fresh install — no adb push. Defensive like the
+/// rest of the pipeline: if extraction or Vosk fails to load for any reason,
+/// it simply stays dark and the session is unchanged. The caption is
+/// best-effort; it never feeds the report and never breaks the run.
 class VoskLiveTranscriber {
   VoskLiveTranscriber._();
   static final VoskLiveTranscriber instance = VoskLiveTranscriber._();
 
-  /// Unzipped model directory, sideloaded to the app's external files dir
-  /// (adb push), exactly like the Gemma and Whisper models.
-  static const _modelDir = 'vosk-model-small-es-0.42';
+  /// Zipped model, bundled as a Flutter asset (see pubspec.yaml) so a fresh
+  /// install works without any adb push. Unzipped lazily on first use by
+  /// [ModelLoader] (from vosk_flutter_2) into app storage; cached there for
+  /// every later launch.
+  static const _modelAsset = 'assets/models/vosk-model-small-es-0.42.zip';
 
   Model? _model;
   Recognizer? _recognizer;
@@ -48,20 +50,25 @@ class VoskLiveTranscriber {
     if (_recognizer != null || _triedLoad) return;
     _triedLoad = true;
     try {
-      final dir = await getExternalStorageDirectory();
-      if (dir == null) return;
-      final path = '${dir.path}/$_modelDir';
-      if (!Directory(path).existsSync()) return; // not sideloaded → stays dark
-
+      // Extracts the bundled asset to app storage on first call and reuses
+      // it after (ModelLoader checks the target dir before unzipping again).
+      final path = await ModelLoader().loadFromAssets(_modelAsset);
       final plugin = VoskFlutterPlugin.instance();
       _model = await plugin.createModel(path);
       _recognizer = await plugin.createRecognizer(
         model: _model!,
         sampleRate: sampleRate,
       );
-    } catch (_) {
+      _log('vosk: loaded');
+    } catch (e) {
+      _log('vosk: none (exception: $e)');
       _recognizer = null;
     }
+  }
+
+  void _log(String msg) {
+    // ignore: avoid_print
+    print('[STT] $msg');
   }
 
   /// Feed one PCM16 (mono, 16 kHz) chunk. Non-blocking: chunks are queued and

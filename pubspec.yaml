@@ -52,6 +52,12 @@ flutter:
 
   assets:
     - assets/brand/
+    # Vosk Spanish small model (live caption STT), bundled so the build works
+    # out of the box — no adb push needed on a fresh install. Small model only
+    # (~38 MB zipped); Gemma/Whisper stay sideloaded, they're too big to ship
+    # in the APK. Unzipped lazily on first use via vosk_flutter_2's
+    # ModelLoader (see VoskLiveTranscriber.start()).
+    - assets/models/vosk-model-small-es-0.42.zip
 
   # Bundled so the brand type works fully offline — no runtime font download.
   # Both are variable fonts (weight axis); Flutter picks the nearest instance

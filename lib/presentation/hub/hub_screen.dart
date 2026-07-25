@@ -12,6 +12,7 @@ import '../benchmark/benchmark_screen.dart';
 import '../home/home_screen.dart';
 import '../progress/progress_screen.dart';
 import '../profiles/profile_picker_screen.dart';
+import 'widgets/playful_hold_header.dart';
 import '../profiles/widgets/profile_sheet.dart';
 
 /// INICIO — the hub (Flujo, mapa). Vox welcomes the child by name; one big
@@ -90,27 +91,10 @@ class HubScreen extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: GestureDetector(
+                      child: PlayfulHoldHeader(
+                        profile: profile,
                         onTap: () => _openProfileSheet(context),
-                        onLongPress: () => _switchProfile(context),
-                        behavior: HitTestBehavior.opaque,
-                        child: Row(
-                          children: [
-                            AvatarHero(
-                              tag: profile.id,
-                              emoji: profile.avatarKey,
-                              size: 40,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                profile.name,
-                                style: text.titleMedium,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
+                        onLongPressComplete: () => _switchProfile(context),
                       ),
                     ),
                     ValueListenableBuilder<ThemeMode>(

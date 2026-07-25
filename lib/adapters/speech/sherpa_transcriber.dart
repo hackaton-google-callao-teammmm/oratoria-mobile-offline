@@ -68,7 +68,10 @@ class SherpaTranscriber {
     _triedLoad = true;
     try {
       final dir = await getExternalStorageDirectory();
-      if (dir == null) return;
+      if (dir == null) {
+        _log('whisper: none (no external storage dir)');
+        return;
+      }
       final path = dir.path;
       final ramMb = _availableRamMb();
 
@@ -100,7 +103,8 @@ class SherpaTranscriber {
       // Nothing loaded — no model sideloaded (or all init-failed). The caller
       // falls back to the sample transcript and the session survives.
       _log('whisper: none (${skipped.join('; ')})');
-    } catch (_) {
+    } catch (e) {
+      _log('whisper: none (exception: $e)');
       _recognizer = null;
     }
   }
@@ -165,18 +169,23 @@ class SherpaTranscriber {
   /// the low-memory killer. Loading per-session costs ~1-2 s but keeps the
   /// steady-state footprint to just Gemma, which is far safer on a 3.6 GB phone.
   Future<String?> transcribe(Float32List samples, {int sampleRate = 16000}) async {
-    if (samples.isEmpty) return null;
+    if (samples.isEmpty) {
+      _log('whisper: skipped (empty PCM — recorder produced no samples)');
+      return null;
+    }
     await _ensureLoaded();
     final rec = _recognizer;
-    if (rec == null) return null;
+    if (rec == null) return null; // _ensureLoaded already logged why.
     sherpa.OfflineStream? stream;
     try {
       stream = rec.createStream();
       stream.acceptWaveform(samples: samples, sampleRate: sampleRate);
       rec.decode(stream);
       final text = rec.getResult(stream).text.trim();
+      if (text.isEmpty) _log('whisper: empty result (${samples.length} samples)');
       return text.isEmpty ? null : text;
-    } catch (_) {
+    } catch (e) {
+      _log('whisper: decode failed ($e)');
       return null;
     } finally {
       stream?.free();

@@ -6,6 +6,16 @@ import 'package:flutter/scheduler.dart';
 import '../../app/theme/tokens.dart';
 import 'audience_mood.dart';
 
+/// (scale, alpha) for the "Vox te escucha" halo, driven by the raw mic
+/// [energy] (0..1) — not the smoothed mood, so it reacts instantly to voice.
+/// A faint halo even at silence keeps the "listening" signal always visible;
+/// it just grows and brightens with volume. Clamped so a stray >1/<0 sample
+/// never over/undershoots the curve.
+(double scale, double alpha) haloForEnergy(double energy) {
+  final e = energy.clamp(0.0, 1.0);
+  return (1.0 + e * 0.6, 0.15 + e * 0.35);
+}
+
 /// "La Banca" — one audience face that reacts, live, to how the child is
 /// speaking. The reaction ballistics live in the pure [AudienceMood]
 /// (fast-attack engagement + slow boredom), advanced here by a frame [Ticker]
@@ -99,9 +109,23 @@ class _LaBancaState extends State<LaBanca> with SingleTickerProviderStateMixin {
         math.sin(_elapsed * 1.7 + widget.personality.phaseSeed) *
         (1.2 + e * 2.2);
 
+    // "Vox te escucha" — a soft halo around the tile driven by the raw mic
+    // energy (not the smoothed mood), so it visibly reacts the instant the
+    // child speaks, confirming the room is actually listening.
+    final (haloScale, haloAlpha) = haloForEnergy(widget.energy);
+
     return Container(
-      color: tint,
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: tint,
+        boxShadow: [
+          BoxShadow(
+            color: t.accent.withValues(alpha: haloAlpha),
+            blurRadius: 16 * haloScale,
+            spreadRadius: 2 * haloScale,
+          ),
+        ],
+      ),
       child: Transform.translate(
         offset: Offset(0, -bob),
         child: Transform.scale(

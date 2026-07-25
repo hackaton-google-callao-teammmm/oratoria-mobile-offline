@@ -70,12 +70,17 @@ abstract class CoachFeedbackGenerator {
   /// than real STT — the coach must then NOT judge pace or fillers (they'd be
   /// derived from placeholder text). [pausesTrusted] is false when pauses were
   /// not actually measured from the audio. Honest signals only.
+  ///
+  /// [transcript], when the run is trusted and meaningful, lets an adapter
+  /// reference what the child actually said — never a reason to change the
+  /// verdict (dimensions/numbers/goal stay the rule-based coach's).
   Future<CoachFeedback> generate({
     required ParaverbalMetrics voice,
     required BodyMetrics body,
     required Exercise exercise,
     bool voiceTrusted = true,
     bool pausesTrusted = true,
+    String? transcript,
   });
 
   /// Generates a dynamic initial challenge message based on the user's AI profile.
@@ -97,6 +102,7 @@ abstract class CoachFeedbackGenerator {
       exercise: exercise,
       voiceTrusted: voiceTrusted,
       pausesTrusted: pausesTrusted,
+      transcript: transcript,
     );
     return (feedback, aiProfile);
   }
