@@ -12,6 +12,7 @@ import '../benchmark/benchmark_screen.dart';
 import '../home/home_screen.dart';
 import '../progress/progress_screen.dart';
 import '../profiles/profile_picker_screen.dart';
+import '../profiles/widgets/profile_sheet.dart';
 
 /// INICIO — the hub (Flujo, mapa). Vox welcomes the child by name; one big
 /// "Practicar" button leads into the session, plus "Mi progreso". The dev
@@ -67,6 +68,15 @@ class HubScreen extends StatelessWidget {
     );
   }
 
+  void _openProfileSheet(BuildContext context) {
+    ProfileSheet.show(
+      context: context,
+      profile: profile,
+      store: store,
+      onSwitchProfile: () => _switchProfile(context),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -80,9 +90,8 @@ class HubScreen extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      // Long-press the avatar/name to switch profile — same
-                      // hidden-affordance pattern as long-pressing Vox below.
                       child: GestureDetector(
+                        onTap: () => _openProfileSheet(context),
                         onLongPress: () => _switchProfile(context),
                         behavior: HitTestBehavior.opaque,
                         child: Row(
