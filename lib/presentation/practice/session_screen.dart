@@ -205,9 +205,29 @@ class _SessionScreenState extends State<SessionScreen> {
     if (mounted) setState(() => _energy = norm);
   }
 
-  /// Real on-device transcription of the captured audio. Falls back to the
-  /// sample transcript when the STT model isn't installed or fails, so the
-  /// report always has something to analyse (golden rule).
+  /// The report's transcript. PRIMARY source is the live Vosk transcript
+  /// ([voskText]): its model is bundled in the APK, so it works on any install
+  /// with no sideloading, and it already streamed the whole session. Falls back
+  /// to the batch Whisper pass (only if a Whisper model happens to be
+  /// sideloaded), then to the sample text (untrusted) so the report always
+  /// renders (golden rule).
+  ///
+  /// [capped] is true only for the Whisper path — Whisper decodes just the first
+  /// 30 s, so the per-minute denominator is capped to that window; Vosk streams
+  /// the whole clip, so it isn't.
+  Future<({String text, bool trusted, bool capped})> _resolveTranscript(
+    String voskText,
+    Uint8List pcm,
+  ) async {
+    final vosk = cleanTranscript(voskText);
+    if (vosk.isNotEmpty) return (text: vosk, trusted: true, capped: false);
+    final w = await _transcribe(pcm);
+    return (text: w.text, trusted: w.trusted, capped: w.trusted);
+  }
+
+  /// Batch Whisper transcription of the captured audio (the FALLBACK now that
+  /// Vosk feeds the report). Falls back to the sample transcript when no Whisper
+  /// model is installed or it fails, so the report always has something to show.
   ///
   /// [trusted] is true only when the words came from the real STT — the report
   /// then judges pace and fillers; otherwise those metrics are hidden rather
@@ -245,10 +265,15 @@ class _SessionScreenState extends State<SessionScreen> {
       await _recorder.stop();
     } catch (_) {}
 
-    // Free the live-caption recognizer BEFORE the report's Whisper pass, so two
-    // ASR models are never resident at once on the A12.
+    // The live-caption engine (Vosk, bundled in the APK) has been hearing the
+    // WHOLE session — capture its full transcript BEFORE freeing it. This is now
+    // the PRIMARY source for the report, so it works on any install with no adb
+    // push (unlike a sideloaded Whisper model, which the report only falls back
+    // to). Reading it here also frees Vosk before the rest of the work.
+    var voskText = '';
     if (FeatureFlags.liveCaption) {
       await _captionSub?.cancel();
+      voskText = await VoskLiveTranscriber.instance.finalize();
       await VoskLiveTranscriber.instance.stop();
     }
 
@@ -272,7 +297,7 @@ class _SessionScreenState extends State<SessionScreen> {
     // cheap energy VAD finds the real long pauses, the deterministic report is
     // computed, and Gemma writes the audience's follow-up question (the wow).
     final pcm = _pcm.toBytes();
-    final transcript = await _transcribe(pcm);
+    final transcript = await _resolveTranscript(voskText, pcm);
     // O(n) pause scan, before Gemma so it never competes for RAM/time.
     final pauseScan = const PauseDetector().detect(pcm);
     // The rule-based coach always owns the verdict. When the flag is on, Gemma
@@ -297,7 +322,7 @@ class _SessionScreenState extends State<SessionScreen> {
       // that window when the words came from it. Null for the sample fallback,
       // whose word metrics are hidden anyway.
       transcriptionWindow:
-          transcript.trusted ? SherpaTranscriber.maxAudioWindow : null,
+          transcript.capped ? SherpaTranscriber.maxAudioWindow : null,
       aiProfile: _aiProfile,
     );
 
