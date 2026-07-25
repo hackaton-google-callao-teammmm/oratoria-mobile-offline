@@ -32,6 +32,14 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# permission_handler_windows (transitive, 0.2.1 = latest) compiles with /await
+# and co_await, which pulls in <experimental/coroutine>. MSVC 14.51 (VS 2026)
+# turned that header into a hard static_assert, so the plugin no longer builds.
+# The define is the escape hatch the compiler itself points at. Applied here
+# because the plugin's own CMakeLists lives in the pub cache and upstream has
+# no fixed release. Windows-desktop only — Android and iOS never see this.
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
