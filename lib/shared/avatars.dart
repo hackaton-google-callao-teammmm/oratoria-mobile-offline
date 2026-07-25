@@ -27,7 +27,9 @@ class AvatarBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
       width: size,
       height: size,
       alignment: Alignment.center,

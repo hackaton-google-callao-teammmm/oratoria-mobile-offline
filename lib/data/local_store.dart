@@ -88,6 +88,33 @@ class LocalStore {
     return profile;
   }
 
+  Future<void> updateProfile({
+    required String id,
+    required String name,
+    required String avatarKey,
+  }) async {
+    final all = [
+      for (final p in profiles())
+        if (p.id == id)
+          Profile(id: id, name: name, avatarKey: avatarKey)
+        else
+          p,
+    ];
+    await _prefs.setString(
+      _kProfiles,
+      jsonEncode(all.map((p) => p.toJson()).toList()),
+    );
+  }
+
+  Future<void> deleteProfile(String id) async {
+    final all = profiles().where((p) => p.id != id).toList();
+    await _prefs.setString(
+      _kProfiles,
+      jsonEncode(all.map((p) => p.toJson()).toList()),
+    );
+    await _prefs.remove(_resultsKey(id));
+  }
+
   // ---- Results ----
 
   List<SavedResult> resultsFor(String profileId) {
