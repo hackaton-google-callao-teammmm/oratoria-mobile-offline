@@ -85,7 +85,28 @@ class _MainShellState extends State<MainShell> {
             data: mq.copyWith(
               padding: mq.padding.copyWith(bottom: mq.padding.bottom + barReserve),
             ),
-            child: IndexedStack(index: _index, children: sections),
+            // A soft crossfade + a hair of upward drift between tabs — the same
+            // blur-fade family as Diego's MorphingText, so a tab change reads as
+            // authored motion, not an instant cut.
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 340),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.015),
+                    end: Offset.zero,
+                  ).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: KeyedSubtree(
+                key: ValueKey<int>(_index),
+                child: sections[_index],
+              ),
+            ),
           ),
           Positioned(
             left: 20,
