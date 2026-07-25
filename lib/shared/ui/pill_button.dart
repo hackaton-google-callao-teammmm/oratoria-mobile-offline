@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/tokens.dart';
 
@@ -37,7 +38,10 @@ class _PillButtonState extends State<PillButton> {
       onTapDown: (_) => setState(() => _down = true),
       onTapUp: (_) => setState(() => _down = false),
       onTapCancel: () => setState(() => _down = false),
-      onTap: widget.onPressed,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        widget.onPressed();
+      },
       child: AnimatedScale(
         scale: _down ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 110),

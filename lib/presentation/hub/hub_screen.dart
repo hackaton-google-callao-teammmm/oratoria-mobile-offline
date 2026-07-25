@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/theme_controller.dart';
 import '../../app/theme/tokens.dart';
@@ -74,7 +75,10 @@ class HubScreen extends StatelessWidget {
                               ? Icons.light_mode_outlined
                               : Icons.dark_mode_outlined,
                         ),
-                        onPressed: themeController.toggle,
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          themeController.toggle();
+                        },
                       ),
                     ),
                   ],
@@ -82,11 +86,14 @@ class HubScreen extends StatelessWidget {
                 const Spacer(),
                 // Long-press Vox opens the hidden dev benchmark.
                 GestureDetector(
-                  onLongPress: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const BenchmarkScreen(),
-                    ),
-                  ),
+                  onLongPress: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const BenchmarkScreen(),
+                      ),
+                    );
+                  },
                   child: const Vox(mood: VoxMood.greeting, size: 132),
                 ),
                 const SizedBox(height: 24),
@@ -103,7 +110,10 @@ class HubScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
-                  onPressed: () => _progress(context),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _progress(context);
+                  },
                   icon: const Icon(Icons.insights_rounded, size: 20),
                   label: const Text('Mi progreso'),
                 ),
