@@ -105,8 +105,9 @@ the _look_, not the exact technique.
 
 The web has a richer component set than the mobile. Use these as the **visual/UX
 reference** when refactoring Flutter screens (they are React `.tsx`, so port the
-_look & behaviour_, not the code). Paths are under
-`oratorIA-frontend/apps/web/src/components/`.
+_look & behaviour_, not the code). The full source is copied into this repo under
+[`./web-components/`](./web-components/) (originals live at
+`oratorIA-frontend/apps/web/src/components/`).
 
 ### Reports / results
 
